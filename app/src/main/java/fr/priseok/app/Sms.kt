@@ -8,9 +8,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import fr.priseok.app.core.Schedule
+import java.time.ZoneId
 
 object Sms {
     const val EXTRA_TEST = "test"
+    const val EXTRA_CONTACT = "contact"
 
     fun canSend(ctx: Context) =
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
@@ -19,19 +22,35 @@ object Sms {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) ctx.getSystemService(SmsManager::class.java)
         else @Suppress("DEPRECATION") SmsManager.getDefault()
 
-    /** Sends the alert for [cycle] once. Records the attempt so it is never sent twice. */
-    fun sendAlert(ctx: Context, cycle: Long) {
+    /**
+     * Texts [contactId] about the dose at [cycle], once, if a medication of theirs in it is still
+     * unconfirmed. Names those medications when they have names.
+     */
+    fun sendAlert(ctx: Context, cycle: Long, contactId: Long) {
         val store = Store(ctx)
+        val s = store.settings()
+        val contact = s.contact(contactId) ?: return
         val e = store.history()[cycle]
-        if (e?.takenAt != null || e?.smsAt != null) return
-        val ok = send(ctx, store.settings().phone, ctx.getString(R.string.sms_alert), cycle, test = false)
-        store.update(cycle) { it.copy(smsAt = System.currentTimeMillis(), smsFailed = !ok) }
-        if (ok) Notifier.showReminder(ctx, cycle, late = true)
+        if (e?.sms?.containsKey(contactId) == true) return
+        val dose = Schedule.doseAt(s, cycle, ZoneId.systemDefault()) ?: return
+        val open = dose.meds.filter { contactId in it.contactIds && e?.isTaken(it.id) != true }
+        if (open.isEmpty()) return
+        val names = open.map { it.name.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
+        val text = if (names.isEmpty()) ctx.getString(R.string.sms_alert) else ctx.getString(R.string.sms_alert_named, names)
+        // Recorded before sending, so a crash can never lead to a second text.
+        store.recordSms(cycle, contactId, System.currentTimeMillis())
+        val ok = send(ctx, contact.phone, text, cycle, contactId, test = false)
+        if (!ok) store.recordSmsFailed(cycle, contactId)
+        else Notifier.showReminder(ctx, cycle, late = true)
     }
 
-    fun sendTest(ctx: Context, phone: String): Boolean = send(ctx, phone, ctx.getString(R.string.sms_test), 0L, test = true)
+    fun sendTest(ctx: Context, phone: String): Boolean = send(ctx, phone, ctx.getString(R.string.sms_test), 0L, 0L, test = true)
 
-    private fun send(ctx: Context, phone: String, text: String, cycle: Long, test: Boolean): Boolean {
+    /** One request code per dose and contact, so texts sent together each report their own result. */
+    private fun resultCode(cycle: Long, contactId: Long, test: Boolean): Int =
+        if (test) 21 else 30_000_000 + (Alarms.confirmCode(cycle) % 1_000_000) * 10 + (contactId % 10).toInt()
+
+    private fun send(ctx: Context, phone: String, text: String, cycle: Long, contactId: Long, test: Boolean): Boolean {
         if (phone.isBlank()) {
             Notifier.info(ctx, R.string.sms_not_sent, ctx.getString(R.string.sms_no_number))
             return false
@@ -42,10 +61,10 @@ object Sms {
         }
         return try {
             val sent = PendingIntent.getBroadcast(
-                // One request code per dose, so two texts in a row each report their own result.
-                ctx, if (test) 21 else 20_000_000 + Alarms.confirmCode(cycle),
+                ctx, resultCode(cycle, contactId, test),
                 Intent(ctx, SmsResultReceiver::class.java)
                     .putExtra(Alarms.EXTRA_CYCLE, cycle)
+                    .putExtra(EXTRA_CONTACT, contactId)
                     .putExtra(EXTRA_TEST, test),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )

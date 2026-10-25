@@ -19,6 +19,8 @@ object Notifier {
     /** Notification id of the test reminder. Real reminders get one id per dose (see [reminderId]). */
     const val ID_REMINDER = 10
     private const val ID_INFO = 11
+    /** How long the notification's "Undo" stays. */
+    const val UNDO_SECONDS = 60L
 
     fun reminderId(cycle: Long): Int = if (cycle < 0) ID_REMINDER else Alarms.confirmCode(cycle)
 
@@ -50,31 +52,50 @@ object Notifier {
     )
 
     /**
-     * The reminder for one dose, listing its medications by name.
-     * [late] = the text already went out, but the dose can still be confirmed.
+     * The reminder for one dose, listing its medications not confirmed yet.
+     * [late] = a text already went out, but the dose can still be confirmed.
      */
     fun showReminder(ctx: Context, cycle: Long, late: Boolean = false) {
         if (!allowed(ctx)) return
         ensureChannels(ctx)
-        val names = if (cycle < 0) "" else Store(ctx).settings().let { s ->
-            Schedule.doseAt(s, cycle, ZoneId.systemDefault())?.meds.orEmpty()
+        val names = if (cycle < 0) "" else Store(ctx).let { store ->
+            val e = store.history()[cycle]
+            Schedule.doseAt(store.settings(), cycle, ZoneId.systemDefault())?.meds.orEmpty()
+                .filter { e?.isTaken(it.id) != true }
                 .map { it.name.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
         }
         val hint = ctx.getString(if (late) R.string.notif_text_late else R.string.notif_text)
         val text = if (names.isEmpty()) hint else "$names\n$hint"
-        val confirm = Alarms.intent(ctx, Alarms.ACTION_CONFIRM, cycle, Alarms.confirmCode(cycle))
-        val n = NotificationCompat.Builder(ctx, CH_REMINDER)
+        val b = NotificationCompat.Builder(ctx, CH_REMINDER)
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(0xFFFF8EA1.toInt())
             .setContentTitle(ctx.getString(R.string.notif_question))
             .setContentText(names.ifEmpty { hint })
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openApp(ctx))
-            .addAction(R.drawable.ic_check, ctx.getString(R.string.confirm_button), confirm)
+            .addAction(R.drawable.ic_check, ctx.getString(R.string.confirm_button), Alarms.intent(ctx, Alarms.ACTION_CONFIRM, cycle, Alarms.confirmCode(cycle)))
             .setSilent(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
+        if (cycle >= 0) {
+            b.addAction(R.drawable.ic_notif, ctx.getString(R.string.snooze_button), Alarms.intent(ctx, Alarms.ACTION_SNOOZE, cycle, Alarms.snoozeCode(cycle)))
+        }
+        ctx.getSystemService(NotificationManager::class.java).notify(reminderId(cycle), b.build())
+    }
+
+    /** After confirming from the notification: a short-lived "Undo", in place of the reminder. */
+    fun showUndo(ctx: Context, cycle: Long) {
+        if (!allowed(ctx)) return
+        ensureChannels(ctx)
+        val n = NotificationCompat.Builder(ctx, CH_INFO)
+            .setSmallIcon(R.drawable.ic_check)
+            .setContentTitle(ctx.getString(R.string.undo_title))
+            .setContentIntent(openApp(ctx))
+            .addAction(R.drawable.ic_back, ctx.getString(R.string.undo), Alarms.intent(ctx, Alarms.ACTION_UNDO, cycle, Alarms.undoCode(cycle)))
+            .setTimeoutAfter(UNDO_SECONDS * 1000)
+            .setAutoCancel(true)
+            .setSilent(true)
             .build()
         ctx.getSystemService(NotificationManager::class.java).notify(reminderId(cycle), n)
     }

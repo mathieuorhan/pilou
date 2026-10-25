@@ -15,11 +15,16 @@ private fun at(y: Int, mo: Int, d: Int, h: Int, mi: Int = 0) = ZonedDateTime.of(
 private fun ms(z: ZonedDateTime) = z.toInstant().toEpochMilli()
 private val since = ms(at(2026, 1, 1, 0))
 
-/** One medication at 9h00 every day, as in version 1. */
-private fun med(id: Long = 1, vararg times: Int = intArrayOf(9 * 60), f: Med.() -> Med = { this }) =
-    Med(id = id, times = times.toList(), activeSince = since).f()
+private val camille = Contact(1L, "Camille", "0639980000")
+private val sara = Contact(2L, "Sara", "0639980001")
 
-private fun settings(vararg meds: Med, delay: Int = 120) = Settings(meds.toList(), delay, "Camille", "0639980000")
+/** One medication at 9h00 every day, alerting Camille after 2 h, as in version 1. */
+private fun med(id: Long = 1, vararg times: Int = intArrayOf(9 * 60), f: Med.() -> Med = { this }) =
+    Med(id = id, times = times.toList(), contactIds = setOf(1L), activeSince = since).f()
+
+private fun settings(vararg meds: Med, contacts: List<Contact> = listOf(camille)) = Settings(meds.toList(), contacts)
+
+private fun dose(s: Settings, z: ZonedDateTime) = Schedule.doseAt(s, ms(z), paris)!!
 
 class ScheduleTest {
     private val daily = settings(med())
@@ -82,6 +87,12 @@ class ScheduleTest {
         assertNull(Schedule.plan(s, at(2026, 3, 12, 12), emptyMap()).nextReminder)
     }
 
+    @Test fun pausedMedicationHasNoDose() {
+        val s = settings(med(1, 8 * 60) { copy(paused = true) }, med(2, 20 * 60))
+        assertEquals(listOf(at(2026, 3, 10, 20)), Schedule.dosesOn(s, LocalDate.of(2026, 3, 10), paris).map { it.at })
+        assertNull(Schedule.after(settings(med { copy(paused = true) }), at(2026, 3, 10, 8)))
+    }
+
     @Test fun newMedicationDoesNotCountBeforeItWasAdded() {
         val added = med(2, 8 * 60) { copy(activeSince = ms(at(2026, 3, 10, 10))) }
         val s = settings(med(), added)
@@ -95,19 +106,35 @@ class ScheduleTest {
         assertNull(Schedule.doseAt(s, ms(at(2026, 3, 10, 9)), paris))
     }
 
-    // ---- delay ----
+    // ---- alert time ----
 
     @Test fun deadlineIsRealDurationAcrossMidnight() {
-        val s = settings(med(1, 22 * 60), delay = 180)
-        assertEquals(at(2026, 3, 11, 1), Schedule.deadline(s, at(2026, 3, 10, 22)))
+        val s = settings(med(1, 22 * 60) { copy(delayMinutes = 180) })
+        assertEquals(at(2026, 3, 11, 1), Schedule.deadline(dose(s, at(2026, 3, 10, 22))))
     }
 
-    @Test fun delayStepsThroughTheOfferedValues() {
-        assertEquals(150, Schedule.stepDelay(120, up = true))
-        assertEquals(90, Schedule.stepDelay(120, up = false))
-        assertEquals(240, Schedule.stepDelay(210, up = true)) // a version 1 value in between
-        assertEquals(15, Schedule.stepDelay(15, up = false))
-        assertEquals(24 * 60, Schedule.stepDelay(24 * 60, up = true))
+    @Test fun alertChosenAsTimeOfDay() {
+        val m = med()
+        assertEquals(120, Schedule.delayForAlertTime(m, 9 * 60, 11 * 60))
+        assertEquals(180, Schedule.delayForAlertTime(med(1, 22 * 60), 22 * 60, 1 * 60)) // next day
+        assertEquals(60 to true, Schedule.alertTime(22 * 60, 180))
+        assertEquals(15, Schedule.delayForAlertTime(m, 9 * 60, 9 * 60 + 5)) // at least 15 min
+    }
+
+    @Test fun alertComesBeforeTheNextDoseOfTheMedication() {
+        assertEquals(24 * 60 - 15, Schedule.maxDelayMinutes(med()))
+        assertEquals(24 * 60, Schedule.maxDelayMinutes(med { copy(frequency = Frequency.WEEKLY) }))
+        assertEquals(4 * 60 + 15, Schedule.maxDelayMinutes(med(1, 8 * 60, 12 * 60 + 30, 20 * 60)))
+        assertEquals(4 * 60 + 15, Schedule.delayForAlertTime(med(1, 8 * 60, 12 * 60 + 30), 8 * 60, 14 * 60))
+    }
+
+    @Test fun eachMedicationHasItsOwnAlertTime() {
+        val s = settings(med(1, 8 * 60) { copy(delayMinutes = 60) }, med(2, 8 * 60) { copy(delayMinutes = 180, contactIds = setOf(2L)) },
+            contacts = listOf(camille, sara))
+        val d = dose(s, at(2026, 3, 10, 8))
+        assertEquals(at(2026, 3, 10, 9), Schedule.deadline(d)) // missed from the earliest one
+        assertEquals(at(2026, 3, 10, 9), Schedule.alertTime(d, 1L, null))
+        assertEquals(at(2026, 3, 10, 11), Schedule.alertTime(d, 2L, null))
     }
 
     // ---- plan: which alarms to set ----
@@ -115,78 +142,83 @@ class ScheduleTest {
     @Test fun beforeReminderOnlyNextReminderIsSet() {
         val p = Schedule.plan(daily, at(2026, 3, 10, 8), emptyMap())
         assertEquals(ms(at(2026, 3, 10, 9)), p.nextReminder)
-        assertNull(p.deadlineAt)
-        assertTrue(p.sendSmsNowFor.isEmpty())
+        assertNull(p.nextAlertAt)
+        assertTrue(p.sendNow.isEmpty())
     }
 
-    @Test fun afterReminderDeadlineIsArmed() {
+    @Test fun afterReminderAlertIsArmed() {
         val p = Schedule.plan(daily, at(2026, 3, 10, 9, 30), emptyMap())
-        assertEquals(ms(at(2026, 3, 10, 9)), p.deadlineCycle)
-        assertEquals(ms(at(2026, 3, 10, 11)), p.deadlineAt)
+        assertEquals(ms(at(2026, 3, 10, 11)), p.nextAlertAt)
         assertEquals(ms(at(2026, 3, 11, 9)), p.nextReminder)
     }
 
-    @Test fun confirmedDoseCancelsDeadline() {
+    @Test fun confirmedDoseCancelsAlert() {
         val c = ms(at(2026, 3, 10, 9))
         val p = Schedule.plan(daily, at(2026, 3, 10, 9, 30), mapOf(c to Entry(c, takenAt = c + 60_000)))
-        assertNull(p.deadlineAt)
-        assertTrue(p.sendSmsNowFor.isEmpty())
+        assertNull(p.nextAlertAt)
+        assertTrue(p.sendNow.isEmpty())
     }
 
     @Test fun phoneOffAtDeadlineSendsLateSms() {
         val p = Schedule.plan(daily, at(2026, 3, 10, 13), emptyMap())
-        assertEquals(listOf(ms(at(2026, 3, 10, 9))), p.sendSmsNowFor)
+        assertEquals(listOf(ms(at(2026, 3, 10, 9)) to 1L), p.sendNow.map { it.cycle to it.contactId })
     }
 
     @Test fun smsIsNeverSentTwice() {
         val c = ms(at(2026, 3, 10, 9))
-        val p = Schedule.plan(daily, at(2026, 3, 10, 13), mapOf(c to Entry(c, smsAt = c + 1)))
-        assertTrue(p.sendSmsNowFor.isEmpty())
+        val p = Schedule.plan(daily, at(2026, 3, 10, 13), mapOf(c to Entry(c, sms = mapOf(1L to c + 1))))
+        assertTrue(p.sendNow.isEmpty())
     }
 
     @Test fun veryOldMissIsNotReported() {
-        val s = settings(med(), delay = 15)
-        val p = Schedule.plan(s, at(2026, 3, 10, 23), emptyMap()) // deadline 9h15, now 23h
-        assertTrue(p.sendSmsNowFor.isEmpty())
+        val s = settings(med { copy(delayMinutes = 15) })
+        assertTrue(Schedule.plan(s, at(2026, 3, 10, 23), emptyMap()).sendNow.isEmpty()) // deadline 9h15, now 23h
     }
 
     @Test fun doseBeforeSetupIsIgnored() {
         // Set up at 10h for a 9h reminder: today's dose was never asked, so no SMS at 11h.
         val s = settings(med { copy(activeSince = ms(at(2026, 3, 10, 10))) })
         val p = Schedule.plan(s, at(2026, 3, 10, 10, 1), emptyMap())
-        assertNull(p.deadlineAt)
-        assertTrue(p.sendSmsNowFor.isEmpty())
+        assertNull(p.nextAlertAt)
+        assertTrue(p.sendNow.isEmpty())
     }
 
-    @Test fun earliestOfSeveralOpenDeadlinesIsArmed() {
+    @Test fun earliestOfSeveralOpenAlertsIsArmed() {
         val s = settings(med(1, 8 * 60), med(2, 9 * 60))
-        val p = Schedule.plan(s, at(2026, 3, 10, 9, 30), emptyMap())
-        assertEquals(ms(at(2026, 3, 10, 8)), p.deadlineCycle)
-        assertEquals(ms(at(2026, 3, 10, 10)), p.deadlineAt)
+        assertEquals(ms(at(2026, 3, 10, 10)), Schedule.plan(s, at(2026, 3, 10, 9, 30), emptyMap()).nextAlertAt)
     }
 
-    @Test fun nextDeadlineIsArmedOnceTheFirstTextIsSent() {
+    @Test fun nextAlertIsArmedOnceTheFirstTextIsSent() {
         val s = settings(med(1, 8 * 60), med(2, 9 * 60))
         val c = ms(at(2026, 3, 10, 8))
-        val p = Schedule.plan(s, at(2026, 3, 10, 10), mapOf(c to Entry(c, smsAt = ms(at(2026, 3, 10, 10)))))
-        assertEquals(ms(at(2026, 3, 10, 9)), p.deadlineCycle)
+        val p = Schedule.plan(s, at(2026, 3, 10, 10), mapOf(c to Entry(c, sms = mapOf(1L to ms(at(2026, 3, 10, 10))))))
+        assertEquals(ms(at(2026, 3, 10, 11)), p.nextAlertAt)
+        assertTrue(p.sendNow.isEmpty())
     }
 
     @Test fun severalMissesWhilePhoneWasOffAreAllReported() {
         val s = settings(med(1, 8 * 60), med(2, 9 * 60))
-        assertEquals(listOf(ms(at(2026, 3, 10, 8)), ms(at(2026, 3, 10, 9))), Schedule.plan(s, at(2026, 3, 10, 12), emptyMap()).sendSmsNowFor)
+        assertEquals(listOf(ms(at(2026, 3, 10, 8)), ms(at(2026, 3, 10, 9))), Schedule.plan(s, at(2026, 3, 10, 12), emptyMap()).sendNow.map { it.cycle })
     }
 
-    @Test fun medicationWithoutAlertNeverTexts() {
-        val s = settings(med { copy(alert = false) })
-        val p = Schedule.plan(s, at(2026, 3, 10, 9, 30), emptyMap())
-        assertNull(p.deadlineAt)
-        assertTrue(Schedule.plan(s, at(2026, 3, 10, 13), emptyMap()).sendSmsNowFor.isEmpty())
+    @Test fun medicationWithoutContactNeverTexts() {
+        val s = settings(med { copy(contactIds = emptySet()) })
+        assertNull(Schedule.plan(s, at(2026, 3, 10, 9, 30), emptyMap()).nextAlertAt)
+        assertTrue(Schedule.plan(s, at(2026, 3, 10, 13), emptyMap()).sendNow.isEmpty())
     }
 
-    @Test fun doseAlertsIfOneOfItsMedicationsDoes() {
-        val s = settings(med(1) { copy(alert = false) }, med(2))
-        assertEquals(ms(at(2026, 3, 10, 9)), Schedule.plan(s, at(2026, 3, 10, 9, 30), emptyMap()).deadlineCycle)
+    @Test fun eachContactIsTextedForTheirOwnMedications() {
+        val s = settings(med(1, 8 * 60), med(2, 8 * 60) { copy(contactIds = setOf(2L)) }, contacts = listOf(camille, sara))
+        val c = ms(at(2026, 3, 10, 8))
+        assertEquals(listOf(1L, 2L), Schedule.plan(s, at(2026, 3, 10, 11), emptyMap()).sendNow.map { it.contactId })
+        // Sara's medication was confirmed on its own: only Camille is texted.
+        val p = Schedule.plan(s, at(2026, 3, 10, 11), mapOf(c to Entry(c, medsTaken = mapOf(2L to c))))
+        assertEquals(listOf(1L), p.sendNow.map { it.contactId })
+    }
+
+    @Test fun removedContactIsNeverTexted() {
+        val s = settings(med { copy(contactIds = setOf(2L)) })
+        assertTrue(Schedule.plan(s, at(2026, 3, 10, 13), emptyMap()).sendNow.isEmpty())
     }
 
     // ---- which dose the button confirms ----
@@ -223,11 +255,21 @@ class ScheduleTest {
         assertEquals(listOf(LocalDate.of(2026, 2, 24), LocalDate.of(2026, 3, 3), LocalDate.of(2026, 3, 10)), r.map { it.first })
     }
 
-    @Test fun statusOfACycle() {
-        val c = ms(at(2026, 3, 10, 9))
-        assertEquals(CycleStatus.PENDING, Schedule.status(daily, c, null, at(2026, 3, 10, 10)))
-        assertEquals(CycleStatus.MISSED, Schedule.status(daily, c, null, at(2026, 3, 10, 12)))
-        assertEquals(CycleStatus.TAKEN, Schedule.status(daily, c, Entry(c, takenAt = c), at(2026, 3, 10, 12)))
+    @Test fun statusOfADose() {
+        val d = dose(daily, at(2026, 3, 10, 9))
+        val c = d.cycle
+        assertEquals(CycleStatus.PENDING, Schedule.status(d, null, at(2026, 3, 10, 10)))
+        assertEquals(CycleStatus.MISSED, Schedule.status(d, null, at(2026, 3, 10, 12)))
+        assertEquals(CycleStatus.TAKEN, Schedule.status(d, Entry(c, takenAt = c), at(2026, 3, 10, 12)))
+    }
+
+    @Test fun doseIsTakenOnceEveryMedicationIs() {
+        val s = settings(med(1, 8 * 60), med(2, 8 * 60))
+        val d = dose(s, at(2026, 3, 10, 8))
+        val c = d.cycle
+        assertEquals(false, Entry(c, medsTaken = mapOf(1L to c)).isTaken(d))
+        assertEquals(true, Entry(c, medsTaken = mapOf(1L to c, 2L to c + 5)).isTaken(d))
+        assertEquals(c + 5, Entry(c, medsTaken = mapOf(1L to c, 2L to c + 5)).takenTime(d))
     }
 }
 
@@ -238,15 +280,17 @@ class HomeTest {
     @Test fun due() {
         val h = Home.state(s, emptyMap(), at(10, 9, 30))
         assertEquals(Phase.DUE, h.phase)
-        assertEquals(at(10, 11), h.deadline)
+        assertEquals(at(10, 11), h.alertAt)
+        assertEquals(listOf(camille), h.alertContacts)
         assertEquals(ms(at(10, 9)), h.confirmCycle)
     }
 
     @Test fun missedAfterSms() {
         val c = ms(at(10, 9))
-        val h = Home.state(s, mapOf(c to Entry(c, smsAt = ms(at(10, 11)))), at(10, 12))
+        val h = Home.state(s, mapOf(c to Entry(c, sms = mapOf(1L to ms(at(10, 11))))), at(10, 12))
         assertEquals(Phase.MISSED, h.phase)
         assertEquals(at(10, 11), h.smsAt)
+        assertEquals(listOf(camille), h.smsContacts)
         assertEquals(c, h.confirmCycle)
     }
 
@@ -268,8 +312,7 @@ class HomeTest {
 
     @Test fun nothingLeftAfterTheLastDayOfACourse() {
         val course = settings(med { copy(endDate = LocalDate.of(2026, 3, 9)) })
-        val h = Home.state(course, emptyMap(), at(10, 16))
-        assertNull(h.next)
+        assertNull(Home.state(course, emptyMap(), at(10, 16)).next)
     }
 
     @Test fun todayListsEveryDoseWithItsOwnButton() {
@@ -287,11 +330,19 @@ class HomeTest {
         assertEquals(false, taken[0].confirmable)
     }
 
+    @Test fun oneMedicationOfADoseCanBeConfirmedAlone() {
+        val two = settings(med(1, 8 * 60), med(2, 8 * 60))
+        val c = ms(at(10, 8))
+        val rows = Home.today(two, mapOf(c to Entry(c, medsTaken = mapOf(2L to c))), at(10, 8, 30), null)
+        assertEquals(setOf(2L), rows[0].medsTaken)
+        assertEquals(CycleStatus.PENDING, rows[0].status)
+    }
+
     @Test fun dayIsMissedIfOneDoseWas() {
         val two = settings(med(1, 8 * 60), med(2, 20 * 60))
         val c8 = ms(at(9, 8))
         val doses = Schedule.dosesOn(two, LocalDate.of(2026, 3, 9), paris)
-        assertEquals(CycleStatus.MISSED, Home.dayStatus(two, doses, mapOf(c8 to Entry(c8, takenAt = c8)), at(10, 12)))
+        assertEquals(CycleStatus.MISSED, Home.dayStatus(doses, mapOf(c8 to Entry(c8, takenAt = c8)), at(10, 12)))
     }
 }
 

@@ -52,6 +52,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.Role
 import java.time.LocalDate
 import androidx.compose.ui.res.stringResource
 import java.time.ZonedDateTime
@@ -60,14 +65,24 @@ data class HistoryItem(val label: String, val status: CycleStatus, val date: Loc
 
 /** A line of today's list, ready to show. [status] null = still to come. */
 data class TodayItem(
+    val cycle: Long,
     val time: String,
     val names: String,
     val status: CycleStatus?,
     val detail: String,
     /** The dose this line's own button confirms. Null = no button. */
     val confirmCycle: Long?,
+    /** Its medications, when there are several: each can be confirmed alone. */
+    val meds: List<MedChip>,
 )
 
+/** One medication of a dose. [canConfirm] = tapping it confirms just this one. */
+data class MedChip(val id: Long, val name: String, val taken: Boolean, val canConfirm: Boolean)
+
+/** What the undo bar shows after a confirmation in the app. */
+data class UndoBar(val text: String, val onUndo: () -> Unit)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     phase: Phase,
@@ -80,7 +95,9 @@ fun HomeScreen(
     celebrate: Int,
     permissions: @Composable () -> Unit,
     onConfirm: (Long) -> Unit,
+    onConfirmMed: (Long, Long) -> Unit,
     onSettings: () -> Unit,
+    undo: UndoBar? = null,
     modifier: Modifier = Modifier,
 ) {
     val p = LocalPalette.current
@@ -90,8 +107,9 @@ fun HomeScreen(
         Phase.TAKEN -> Mood.HAPPY
         Phase.MISSED -> Mood.WORRIED
     }
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
@@ -147,14 +165,14 @@ fun HomeScreen(
 
         permissions()
 
-        if (today.size > 1) {
+        if (today.size > 1 || today.any { it.meds.isNotEmpty() }) {
             Spacer(Modifier.height(32.dp))
             Text(
                 stringResource(R.string.today_title), style = MaterialTheme.typography.titleMedium, color = p.pine,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            today.forEach { TodayRow(it, onConfirm) }
+            today.forEach { TodayRow(it, onConfirm, onConfirmMed) }
         }
 
         if (history.isNotEmpty()) {
@@ -177,10 +195,13 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(32.dp))
     }
+    undo?.let { UndoSnack(it, Modifier.align(Alignment.BottomCenter)) }
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TodayRow(item: TodayItem, onConfirm: (Long) -> Unit) {
+private fun TodayRow(item: TodayItem, onConfirm: (Long) -> Unit, onConfirmMed: (Long, Long) -> Unit) {
     val p = LocalPalette.current
     val color = when (item.status) {
         CycleStatus.TAKEN -> p.leaf
@@ -195,14 +216,21 @@ private fun TodayRow(item: TodayItem, onConfirm: (Long) -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .background(p.surface)
             .border(1.dp, p.line, RoundedCornerShape(20.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .semantics(mergeDescendants = true) {},
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(width = 8.dp, height = 36.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("${item.time} · ${item.names}", style = MaterialTheme.typography.bodyLarge, color = p.pine)
+            if (item.meds.isEmpty()) {
+                Text("${item.time} · ${item.names}", style = MaterialTheme.typography.bodyLarge, color = p.pine)
+            } else {
+                Text(item.time, style = MaterialTheme.typography.bodyLarge, color = p.pine)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(vertical = 4.dp),
+                ) { item.meds.forEach { MedPill(it) { onConfirmMed(item.cycle, it.id) } } }
+            }
             Text(item.detail, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
         }
         item.confirmCycle?.let { c ->
@@ -213,6 +241,46 @@ private fun TodayRow(item: TodayItem, onConfirm: (Long) -> Unit) {
                 modifier = Modifier.semantics { contentDescription = cd },
             ) { Text(stringResource(R.string.row_confirm), color = p.pine) }
         }
+    }
+}
+
+/** A medication in a dose line: ticked when taken, tappable to confirm it alone. */
+@Composable
+private fun MedPill(m: MedChip, onConfirm: () -> Unit) {
+    val p = LocalPalette.current
+    val cd = stringResource(if (m.taken) R.string.med_taken_cd else R.string.med_confirm_cd, m.name)
+    var mod = Modifier
+        .clip(CircleShape)
+        .background(if (m.taken) p.leaf.copy(alpha = 0.18f) else p.mist)
+        .border(1.dp, if (m.taken) p.leaf else p.line, CircleShape)
+    if (m.canConfirm) mod = mod.clickable(role = Role.Button, onClick = onConfirm)
+    Row(
+        mod.semantics(mergeDescendants = true) { contentDescription = cd }.padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (m.taken) {
+            Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = p.leaf, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(m.name, style = MaterialTheme.typography.bodyMedium, color = p.pine)
+    }
+}
+
+/** "Taken at 8:06 · Undo", at the bottom of the screen for a few seconds. */
+@Composable
+fun UndoSnack(bar: UndoBar, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    Row(
+        modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(p.pine)
+            .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(bar.text, color = p.onPine, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        TextButton(onClick = bar.onUndo) { Text(stringResource(R.string.undo), color = p.onPine, style = MaterialTheme.typography.labelLarge, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline) }
     }
 }
 
@@ -266,7 +334,7 @@ fun historyItems(
     if (days.isEmpty()) return Wording.Scale.DAYS to emptyList()
     val scale = Wording.scale(days.first().first, days.last().first)
     return scale to days.map { (date, doses) ->
-        HistoryItem(Wording.historyLabel(scale, date, locale), Home.dayStatus(s, doses, history, now), date)
+        HistoryItem(Wording.historyLabel(scale, date, locale), Home.dayStatus(doses, history, now), date)
     }
 }
 
@@ -279,6 +347,7 @@ fun todayItems(
     tx: Texts,
 ): List<TodayItem> = Home.today(s, history, now, bigButtonCycle).map { r ->
     TodayItem(
+        cycle = r.dose.cycle,
         time = tx.time(r.dose.at),
         names = tx.doseNames(r.dose),
         status = r.status,
@@ -290,5 +359,10 @@ fun todayItems(
             else -> tx.str(R.string.row_upcoming)
         },
         confirmCycle = if (r.confirmable) r.dose.cycle else null,
+        meds = if (r.dose.meds.size < 2) emptyList() else r.dose.meds.map { m ->
+            val taken = m.id in r.medsTaken
+            // Any medication of a past or upcoming dose of today can be confirmed alone.
+            MedChip(m.id, tx.medName(m), taken, canConfirm = !taken)
+        },
     )
 }

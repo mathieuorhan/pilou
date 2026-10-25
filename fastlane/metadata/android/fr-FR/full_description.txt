@@ -4,7 +4,8 @@
 <li>Les médicaments à prendre à la même heure sont regroupés dans un seul rappel</li>
 <li>Notification silencieuse, sans son ni vibration</li>
 <li>Bouton « Oui, j'ai pris » directement dans la notification, ou dans l'application</li>
-<li>Sans réponse après le délai choisi (jusqu'à 24 h), un SMS part automatiquement vers un proche. L'alerte peut être désactivée médicament par médicament.</li>
+<li>Sans réponse après le délai choisi (jusqu'à 24 h), un SMS part automatiquement vers les proches choisis pour ce médicament, ou personne</li>
+<li>Bouton « Dans 15 min » dans la notification, annulation après validation, et mise en pause d'un médicament</li>
 <li>Historique des dernières prises</li>
 </ul>
 <p>Aucun compte, aucune connexion internet, aucune publicité. Les données restent sur le téléphone.</p>

@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import fr.priseok.app.core.Entry
 import fr.priseok.app.core.Home
 import fr.priseok.app.core.Settings
 import fr.priseok.app.ui.HomeScreen
@@ -37,6 +37,7 @@ import fr.priseok.app.ui.SettingsScreen
 import fr.priseok.app.ui.hasPermission
 import fr.priseok.app.ui.historyItems
 import fr.priseok.app.ui.todayItems
+import fr.priseok.app.ui.UndoBar
 import fr.priseok.app.ui.rememberTexts
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
@@ -83,10 +84,22 @@ private fun App() {
         if (hasPermission(ctx, perm)) action() else { pendingTest = action; ask.launch(perm) }
     }
 
+    // The last confirmation made in the app, offered for undo for a few seconds: dose, entry before, when.
+    var lastConfirm by remember { mutableStateOf<Triple<Long, Entry?, Long>?>(null) }
+    LaunchedEffect(lastConfirm) { if (lastConfirm != null) { delay(6_000); lastConfirm = null } }
+    fun confirm(cycle: Long, change: () -> Unit) {
+        val before = store.history()[cycle]
+        val now = System.currentTimeMillis()
+        change()
+        Notifier.cancelReminder(ctx, cycle)
+        Alarms.reschedule(ctx)
+        lastConfirm = Triple(cycle, before, now)
+        celebrate++
+    }
+
     Box(Modifier.fillMaxSize().background(LocalPalette.current.mist).safeDrawingPadding()) {
         if (screen == "settings") {
             val back: (() -> Unit)? = if (settings.isConfigured) ({ screen = "home" }) else null
-            BackHandler(enabled = back != null) { back?.invoke() }
             SettingsScreen(
                 initial = settings,
                 firstRun = !settings.isConfigured,
@@ -114,7 +127,7 @@ private fun App() {
             val (scale, past) = historyItems(settings, history, now, tx.locale)
             HomeScreen(
                 phase = home.phase,
-                text = tx.home(home, settings, now),
+                text = tx.home(home, now),
                 confirmCycle = home.confirmCycle,
                 header = tx.header(settings),
                 today = todayItems(settings, history, now, home.confirmCycle, tx),
@@ -122,11 +135,14 @@ private fun App() {
                 history = past,
                 celebrate = celebrate,
                 permissions = { PermissionsCard(refreshKey = tick, onChanged = { tick++; Alarms.reschedule(ctx) }) },
-                onConfirm = { cycle ->
-                    store.markTaken(cycle, System.currentTimeMillis())
-                    Notifier.cancelReminder(ctx, cycle)
-                    Alarms.reschedule(ctx)
-                    celebrate++
+                onConfirm = { cycle -> confirm(cycle) { store.markTaken(cycle, System.currentTimeMillis()) } },
+                onConfirmMed = { cycle, med -> confirm(cycle) { store.markMedTaken(cycle, med, System.currentTimeMillis()) } },
+                undo = lastConfirm?.let { (cycle, before, at) ->
+                    UndoBar(tx.str(R.string.row_taken_at, tx.time(java.time.Instant.ofEpochMilli(at).atZone(now.zone)))) {
+                        store.restore(cycle, before)
+                        lastConfirm = null
+                        Alarms.reschedule(ctx)
+                    }
                 },
                 onSettings = { screen = "settings" },
             )

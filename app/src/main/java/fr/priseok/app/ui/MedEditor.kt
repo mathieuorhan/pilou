@@ -1,6 +1,10 @@
 package fr.priseok.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +55,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.priseok.app.Codec
 import fr.priseok.app.R
+import fr.priseok.app.core.Contact
 import fr.priseok.app.core.Frequency
+import fr.priseok.app.core.Schedule
 import fr.priseok.app.core.Med
 import fr.priseok.app.core.Wording
 import java.time.LocalDate
@@ -61,6 +67,7 @@ import java.time.LocalDate
 @Composable
 fun MedEditor(
     med: Med,
+    contacts: List<Contact>,
     isNew: Boolean,
     canRemove: Boolean,
     today: LocalDate,
@@ -77,6 +84,12 @@ fun MedEditor(
     fun set(change: (Med) -> Med) { json = Codec.meds(listOf(change(d))) }
     // Index of the time being edited; -1 = adding one; null = no dialog.
     var editingTime by remember { mutableStateOf<Int?>(null) }
+    var editingAlert by remember { mutableStateOf(false) }
+    var pickingDate by remember { mutableStateOf(false) }
+    var askSave by remember { mutableStateOf(false) }
+    val done = { onDone(d.copy(name = d.name.trim())) }
+    val back = { if (d != med) askSave = true else onBack() }
+    BackHandler(onBack = back)
 
     Column(
         modifier
@@ -86,7 +99,7 @@ fun MedEditor(
             .padding(horizontal = 24.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = back) {
                 Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back), tint = p.pine)
             }
             Spacer(Modifier.width(4.dp))
@@ -172,42 +185,77 @@ fun MedEditor(
         }
         d.endDate?.let { end ->
             Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RoundStep("−", stringResource(R.string.previous_day)) {
-                    if (end.isAfter(today)) set { it.copy(endDate = end.minusDays(1)) }
+            val endText = Wording.date(end, tx.locale)
+            val cd = stringResource(R.string.last_day_cd, endText)
+            Text(
+                stringResource(R.string.last_day, endText),
+                style = MaterialTheme.typography.titleMedium, color = p.pine, textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(p.surface)
+                    .border(1.dp, p.line, RoundedCornerShape(24.dp))
+                    .clickable(role = Role.Button) { pickingDate = true }
+                    .semantics { contentDescription = cd }
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            // Shortcuts for a course starting today: the last day is today + n - 1.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(3, 7, 10).forEach { n ->
+                    val last = today.plusDays(n - 1L)
+                    SmallChip(pluralStringResource(R.plurals.for_days, n, n), end == last) { set { it.copy(endDate = last) } }
                 }
-                Text(
-                    stringResource(R.string.last_day, Wording.date(end, tx.locale)),
-                    style = MaterialTheme.typography.bodyLarge, color = p.pine,
-                    textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
-                )
-                RoundStep("+", stringResource(R.string.next_day)) { set { it.copy(endDate = end.plusDays(1)) } }
+                val month = today.plusMonths(1).minusDays(1)
+                SmallChip(stringResource(R.string.for_month), end == month) { set { it.copy(endDate = month) } }
             }
         }
 
-        // Alert
+        // If it's missed
+        Section(stringResource(R.string.section_alert))
+        if (contacts.isEmpty()) {
+            Text(stringResource(R.string.alert_need_contact), style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                contacts.forEach { c ->
+                    val on = c.id in d.contactIds
+                    SmallChip(tx.contactName(c), on, Role.Checkbox) {
+                        set { it.copy(contactIds = if (on) it.contactIds - c.id else it.contactIds + c.id) }
+                    }
+                }
+                SmallChip(stringResource(R.string.nobody), d.contactIds.isEmpty(), Role.Checkbox) { set { it.copy(contactIds = emptySet()) } }
+            }
+            if (d.alerts) {
+                // The alert is chosen as a time of day, for the first dose; the app keeps it as a delay,
+                // so every time of the medication gets its alert the same while after.
+                val delay = Schedule.clampedDelay(d)
+                val first = d.times.first()
+                val (alertMin, _) = Schedule.alertTime(first, delay)
+                val alertText = tx.time(alertMin)
+                Spacer(Modifier.height(14.dp))
+                ClockBox(alertText, stringResource(R.string.alert_cd, alertText)) { editingAlert = true }
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.alert_explain), style = MaterialTheme.typography.bodyLarge, color = p.pine)
+                d.times.forEach { t ->
+                    val (a, nextDay) = Schedule.alertTime(t, delay)
+                    Text(
+                        stringResource(if (nextDay) R.string.alert_line_next_day else R.string.alert_line, tx.time(t), tx.time(a)),
+                        style = MaterialTheme.typography.bodyMedium, color = p.pineSoft,
+                    )
+                }
+            }
+        }
+
+        // Pause
         Spacer(Modifier.height(30.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .clickable(role = Role.Switch) { set { it.copy(alert = !it.alert) } }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.alert_switch), style = MaterialTheme.typography.bodyLarge, color = p.pine, modifier = Modifier.weight(1f))
-            Switch(
-                checked = d.alert, onCheckedChange = null,
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = p.pine, checkedThumbColor = p.onPine,
-                    uncheckedTrackColor = p.surface, uncheckedBorderColor = p.line, uncheckedThumbColor = p.line,
-                ),
-            )
+        SwitchRow(stringResource(R.string.pause_switch), d.paused) { set { it.copy(paused = !it.paused) } }
+        if (d.paused) {
+            Text(stringResource(R.string.pause_hint), style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
         }
 
         Spacer(Modifier.height(24.dp))
         Button(
-            onClick = { onDone(d.copy(name = d.name.trim())) },
+            onClick = done,
             modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(containerColor = p.pine, contentColor = p.onPine),
@@ -219,6 +267,33 @@ fun MedEditor(
             }
         }
         Spacer(Modifier.height(32.dp))
+    }
+
+    if (editingAlert) {
+        val first = d.times.first()
+        TimeDialog(
+            initial = Schedule.alertTime(first, Schedule.clampedDelay(d)).first,
+            onPick = { a -> set { it.copy(delayMinutes = Schedule.delayForAlertTime(it, first, a)) }; editingAlert = false },
+            onDismiss = { editingAlert = false },
+        )
+    }
+
+    if (pickingDate) {
+        DateDialog(
+            initial = d.endDate ?: today,
+            firstAllowed = today,
+            onPick = { date -> set { it.copy(endDate = date) }; pickingDate = false },
+            onDismiss = { pickingDate = false },
+        )
+    }
+
+    if (askSave) {
+        UnsavedDialog(
+            onSave = { askSave = false; done() },
+            onDiscard = { askSave = false; onBack() },
+            onKeep = { askSave = false },
+            saveLabel = R.string.done,
+        )
     }
 
     editingTime?.let { i ->
@@ -281,4 +356,60 @@ private fun AddChip(label: String, onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 14.dp),
     )
+}
+
+@Composable
+private fun SmallChip(label: String, on: Boolean, role: Role = Role.RadioButton, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Text(
+        label, style = MaterialTheme.typography.bodyMedium, color = if (on) p.onPine else p.pine,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (on) p.pine else p.surface)
+            .border(1.dp, if (on) p.pine else p.line, CircleShape)
+            .clickable(role = role, onClick = onClick)
+            .semantics { selected = on }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    )
+}
+
+/** A big tappable time, for the alert. */
+@Composable
+private fun ClockBox(time: String, description: String, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(p.surface)
+            .border(1.dp, p.line, RoundedCornerShape(28.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 18.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(time, style = MaterialTheme.typography.displayMedium, color = p.pine)
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    val p = LocalPalette.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(role = Role.Switch, onClick = onToggle)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = p.pine, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked, onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = p.pine, checkedThumbColor = p.onPine,
+                uncheckedTrackColor = p.surface, uncheckedBorderColor = p.line, uncheckedThumbColor = p.line,
+            ),
+        )
+    }
 }
