@@ -84,7 +84,8 @@ fun MedEditor(
     fun set(change: (Med) -> Med) { json = Codec.meds(listOf(change(d))) }
     // Index of the time being edited; -1 = adding one; null = no dialog.
     var editingTime by remember { mutableStateOf<Int?>(null) }
-    var editingAlert by remember { mutableStateOf(false) }
+    // "Other" chosen for the alert delay: shows the fine-grained stepper.
+    var customDelay by rememberSaveable { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
     var askSave by remember { mutableStateOf(false) }
     val done = { onDone(d.copy(name = d.name.trim())) }
@@ -211,37 +212,80 @@ fun MedEditor(
             }
         }
 
-        // If it's missed
+        // If it's missed: a switch, who to text (when there is a choice), and after how long.
         Section(stringResource(R.string.section_alert))
         if (contacts.isEmpty()) {
             Text(stringResource(R.string.alert_need_contact), style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
         } else {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                contacts.forEach { c ->
-                    val on = c.id in d.contactIds
-                    SmallChip(tx.contactName(c), on, Role.Checkbox) {
-                        set { it.copy(contactIds = if (on) it.contactIds - c.id else it.contactIds + c.id) }
+            val single = contacts.singleOrNull()
+            SwitchRow(
+                label = if (single != null) stringResource(R.string.alert_switch_one, tx.contactName(single)) else stringResource(R.string.alert_switch),
+                hint = stringResource(R.string.alert_switch_hint),
+                checked = d.alerts,
+            ) {
+                set {
+                    if (it.alerts) it.copy(contactIds = emptySet())
+                    else {
+                        // Back to whoever this medication alerted before, else the first contact.
+                        val before = med.contactIds.filter { id -> contacts.any { c -> c.id == id } }.toSet()
+                        it.copy(contactIds = before.ifEmpty { setOf(contacts.first().id) })
                     }
                 }
-                SmallChip(stringResource(R.string.nobody), d.contactIds.isEmpty(), Role.Checkbox) { set { it.copy(contactIds = emptySet()) } }
             }
             if (d.alerts) {
-                // The alert is chosen as a time of day, for the first dose; the app keeps it as a delay,
-                // so every time of the medication gets its alert the same while after.
+                if (single == null) {
+                    SubSection(stringResource(R.string.alert_who))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        contacts.forEach { c ->
+                            val on = c.id in d.contactIds
+                            SmallChip(tx.contactName(c), on, Role.Checkbox) {
+                                // At least one contact stays chosen; the switch turns alerts off.
+                                if (!on) set { it.copy(contactIds = it.contactIds + c.id) }
+                                else if (d.contactIds.size > 1) set { it.copy(contactIds = it.contactIds - c.id) }
+                            }
+                        }
+                    }
+                }
+
+                // The alert is a delay after each time, so it reads the same for every dose.
                 val delay = Schedule.clampedDelay(d)
-                val first = d.times.first()
-                val (alertMin, _) = Schedule.alertTime(first, delay)
-                val alertText = tx.time(alertMin)
+                val max = Schedule.maxDelayMinutes(d)
+                val presets = listOf(30, 60, 120).filter { it <= max }
+                val custom = customDelay || delay !in presets
+                SubSection(stringResource(R.string.alert_after))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    presets.forEach { m ->
+                        SmallChip(tx.delay(m), !custom && delay == m) { customDelay = false; set { it.copy(delayMinutes = m) } }
+                    }
+                    SmallChip(stringResource(R.string.delay_other), custom) { customDelay = true }
+                }
+                if (custom) {
+                    Spacer(Modifier.height(12.dp))
+                    fun step(by: Int) = set { it.copy(delayMinutes = (delay + by).coerceIn(Schedule.MIN_DELAY, max)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RoundStep("−", stringResource(R.string.delay_less)) { step(-15) }
+                        Text(
+                            tx.delay(delay), style = MaterialTheme.typography.titleLarge, color = p.pine,
+                            textAlign = TextAlign.Center, modifier = Modifier.width(120.dp),
+                        )
+                        RoundStep("+", stringResource(R.string.delay_more)) { step(15) }
+                    }
+                }
+
                 Spacer(Modifier.height(14.dp))
-                ClockBox(alertText, stringResource(R.string.alert_cd, alertText)) { editingAlert = true }
-                Spacer(Modifier.height(10.dp))
-                Text(stringResource(R.string.alert_explain), style = MaterialTheme.typography.bodyLarge, color = p.pine)
-                d.times.forEach { t ->
-                    val (a, nextDay) = Schedule.alertTime(t, delay)
-                    Text(
-                        stringResource(if (nextDay) R.string.alert_line_next_day else R.string.alert_line, tx.time(t), tx.time(a)),
-                        style = MaterialTheme.typography.bodyMedium, color = p.pineSoft,
-                    )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, p.line, RoundedCornerShape(18.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    d.times.forEach { t ->
+                        val (a, nextDay) = Schedule.alertTime(t, delay)
+                        Text(
+                            stringResource(if (nextDay) R.string.alert_line_next_day else R.string.alert_line, tx.time(t), tx.time(a)),
+                            style = MaterialTheme.typography.bodyMedium, color = p.pineSoft,
+                        )
+                    }
                 }
             }
         }
@@ -267,15 +311,6 @@ fun MedEditor(
             }
         }
         Spacer(Modifier.height(32.dp))
-    }
-
-    if (editingAlert) {
-        val first = d.times.first()
-        TimeDialog(
-            initial = Schedule.alertTime(first, Schedule.clampedDelay(d)).first,
-            onPick = { a -> set { it.copy(delayMinutes = Schedule.delayForAlertTime(it, first, a)) }; editingAlert = false },
-            onDismiss = { editingAlert = false },
-        )
     }
 
     if (pickingDate) {
@@ -373,27 +408,16 @@ private fun SmallChip(label: String, on: Boolean, role: Role = Role.RadioButton,
     )
 }
 
-/** A big tappable time, for the alert. */
 @Composable
-private fun ClockBox(time: String, description: String, onClick: () -> Unit) {
-    val p = LocalPalette.current
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(p.surface)
-            .border(1.dp, p.line, RoundedCornerShape(28.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 18.dp)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(time, style = MaterialTheme.typography.displayMedium, color = p.pine)
-    }
+private fun SubSection(title: String) {
+    Text(
+        title, style = MaterialTheme.typography.bodyMedium, color = LocalPalette.current.pineSoft,
+        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+    )
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+private fun SwitchRow(label: String, checked: Boolean, hint: String? = null, onToggle: () -> Unit) {
     val p = LocalPalette.current
     Row(
         Modifier
@@ -403,7 +427,11 @@ private fun SwitchRow(label: String, checked: Boolean, onToggle: () -> Unit) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = p.pine, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = p.pine)
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
+        }
+        Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked, onCheckedChange = null,
             colors = SwitchDefaults.colors(
