@@ -1,0 +1,1 @@
+Rappel de médicament silencieux, avec alerte SMS à un proche en cas d'oubli

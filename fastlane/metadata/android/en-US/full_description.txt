@@ -1,0 +1,10 @@
+<p>PriseOK asks one question at the time you choose: "Did you take your medication?" (the app is in French).</p>
+<ul>
+<li>Daily, weekly or monthly reminder at a set time</li>
+<li>Silent notification, no sound or vibration</li>
+<li>"Yes, I took it" button right in the notification, or in the app</li>
+<li>If there is no answer after the chosen delay (up to 24 h), an SMS is sent automatically to a loved one</li>
+<li>History of recent doses</li>
+</ul>
+<p>No account, no internet access, no ads. Data stays on the phone.</p>
+<p>The app needs permission to send SMS, which is its core feature. Messages go through the phone's own plan.</p>

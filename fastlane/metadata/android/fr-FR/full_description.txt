@@ -1,0 +1,10 @@
+<p>PriseOK pose une seule question, à l'heure choisie : « As-tu pris ton médicament ? »</p>
+<ul>
+<li>Rappel chaque jour, chaque semaine ou chaque mois, à l'heure choisie</li>
+<li>Notification silencieuse, sans son ni vibration</li>
+<li>Bouton « Oui, j'ai pris » directement dans la notification, ou dans l'application</li>
+<li>Sans réponse après le délai choisi (jusqu'à 24 h), un SMS part automatiquement vers un proche</li>
+<li>Historique des dernières prises</li>
+</ul>
+<p>Aucun compte, aucune connexion internet, aucune publicité. Les données restent sur le téléphone.</p>
+<p>L'application a besoin de l'autorisation d'envoyer des SMS : c'est tout son rôle. Les SMS sont envoyés par le forfait du téléphone.</p>

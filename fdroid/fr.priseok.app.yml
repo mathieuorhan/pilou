@@ -1,0 +1,26 @@
+# Copy this file to metadata/fr.priseok.app.yml in a fork of
+# https://gitlab.com/fdroid/fdroiddata, then open a merge request.
+Categories:
+  - Sports & Health
+License: Apache-2.0
+AuthorName: Mathieu Orhan
+SourceCode: https://github.com/mathieuorhan/priseok
+IssueTracker: https://github.com/mathieuorhan/priseok/issues
+
+AutoName: PriseOK
+
+RepoType: git
+Repo: https://github.com/mathieuorhan/priseok.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
