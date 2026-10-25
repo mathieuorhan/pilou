@@ -17,7 +17,7 @@ No account, no internet access, no cloud backup.
 
 ## Install
 
-Download the APK from [Releases](https://github.com/mathieuorhan/priseok/releases),
+Download the APK from [Releases](https://github.com/mathieuorhan/pilou/releases),
 or add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) to get updates.
 
 ## Build

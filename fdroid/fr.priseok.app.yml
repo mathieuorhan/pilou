@@ -4,13 +4,13 @@ Categories:
   - Sports & Health
 License: Apache-2.0
 AuthorName: Mathieu Orhan
-SourceCode: https://github.com/mathieuorhan/priseok
-IssueTracker: https://github.com/mathieuorhan/priseok/issues
+SourceCode: https://github.com/mathieuorhan/pilou
+IssueTracker: https://github.com/mathieuorhan/pilou/issues
 
 AutoName: Pilou
 
 RepoType: git
-Repo: https://github.com/mathieuorhan/priseok.git
+Repo: https://github.com/mathieuorhan/pilou.git
 
 Builds:
   - versionName: 1.3.0
