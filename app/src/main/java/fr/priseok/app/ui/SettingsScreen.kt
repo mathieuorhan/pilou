@@ -37,8 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -68,7 +66,6 @@ import fr.priseok.app.core.Schedule
 import fr.priseok.app.core.Settings
 import fr.priseok.app.core.Wording
 import androidx.compose.ui.res.stringResource
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +90,8 @@ fun SettingsScreen(
     var name by rememberSaveable { mutableStateOf(initial.contactName) }
     var phone by rememberSaveable { mutableStateOf(initial.phone) }
     var phoneError by rememberSaveable { mutableStateOf<Int?>(null) }
-    var showTime by remember { mutableStateOf(false) }
+    // Which clock is being edited: the reminder or the SMS alert. Null when no dialog is open.
+    var editing by remember { mutableStateOf<Clock?>(null) }
 
     val maxDelay = Schedule.maxDelayMinutes(freq)
     if (delay > maxDelay) delay = maxDelay
@@ -153,19 +151,7 @@ fun SettingsScreen(
         val timeCd = stringResource(R.string.time_cd, tx.time(hour, minute))
         // When
         Section(stringResource(R.string.section_when))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(p.surface)
-                .border(1.dp, p.line, RoundedCornerShape(28.dp))
-                .clickable(role = Role.Button) { showTime = true }
-                .padding(vertical = 18.dp)
-                .semantics { contentDescription = timeCd },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(tx.time(hour, minute), style = MaterialTheme.typography.displayMedium, color = p.pine)
-        }
+        ClockBox(tx.time(hour, minute), timeCd) { editing = Clock.REMINDER }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(Frequency.DAILY to R.string.every_day, Frequency.WEEKLY to R.string.every_week, Frequency.MONTHLY to R.string.every_month)
@@ -203,25 +189,17 @@ fun SettingsScreen(
 
         // Delay
         Section(stringResource(R.string.section_forget))
+        // The alert is chosen as a time of day; the app keeps it as a delay after the reminder,
+        // so moving the reminder moves the alert with it.
+        val (alertMin, nextDay) = Schedule.alertTime(hour, minute, delay)
+        val alertText = tx.time(alertMin / 60, alertMin % 60)
+        ClockBox(alertText, stringResource(R.string.alert_cd, alertText)) { editing = Clock.ALERT }
+        Spacer(Modifier.height(10.dp))
+        Text(stringResource(R.string.alert_explain), style = MaterialTheme.typography.bodyLarge, color = p.pine)
         Text(
-            stringResource(R.string.delay_line, tx.delay(delay)),
-            style = MaterialTheme.typography.bodyLarge, color = p.pine,
+            stringResource(if (nextDay) R.string.alert_gap_next_day else R.string.alert_gap, tx.delay(delay)),
+            style = MaterialTheme.typography.bodyMedium, color = p.pineSoft,
         )
-        Slider(
-            value = delay.toFloat(),
-            onValueChange = { delay = ((it / 15f).roundToInt() * 15).coerceIn(15, maxDelay) },
-            valueRange = 15f..maxDelay.toFloat(),
-            steps = (maxDelay - 15) / 15 - 1,
-            colors = SliderDefaults.colors(
-                thumbColor = p.pine, activeTrackColor = p.pink, inactiveTrackColor = p.line,
-                activeTickColor = androidx.compose.ui.graphics.Color.Transparent,
-                inactiveTickColor = androidx.compose.ui.graphics.Color.Transparent,
-            ),
-        )
-        Row(Modifier.fillMaxWidth()) {
-            Text(tx.delay(15), style = MaterialTheme.typography.labelMedium, color = p.pineSoft, modifier = Modifier.weight(1f))
-            Text(tx.delay(maxDelay), style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
-        }
 
         // Who
         Section(stringResource(R.string.section_who))
@@ -279,17 +257,26 @@ fun SettingsScreen(
         Spacer(Modifier.height(32.dp))
     }
 
-    if (showTime) {
-        val state = rememberTimePickerState(initialHour = hour, initialMinute = minute, is24Hour = android.text.format.DateFormat.is24HourFormat(ctx))
+    editing?.let { clock ->
+        val (aMin, _) = Schedule.alertTime(hour, minute, delay)
+        val (h0, m0) = if (clock == Clock.REMINDER) hour to minute else aMin / 60 to aMin % 60
+        val state = rememberTimePickerState(initialHour = h0, initialMinute = m0, is24Hour = android.text.format.DateFormat.is24HourFormat(ctx))
         AlertDialog(
-            onDismissRequest = { showTime = false },
+            onDismissRequest = { editing = null },
             containerColor = p.mist,
             confirmButton = {
-                TextButton(onClick = { hour = state.hour; minute = state.minute; showTime = false }) {
+                TextButton(onClick = {
+                    if (clock == Clock.REMINDER) {
+                        hour = state.hour; minute = state.minute
+                    } else {
+                        delay = Schedule.delayForAlertTime(hour, minute, state.hour, state.minute, freq)
+                    }
+                    editing = null
+                }) {
                     Text(stringResource(R.string.ok), color = p.pine)
                 }
             },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text(stringResource(R.string.cancel), color = p.pineSoft) } },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text(stringResource(R.string.cancel), color = p.pineSoft) } },
             text = {
                 TimePicker(
                     state,
@@ -305,6 +292,27 @@ fun SettingsScreen(
                 )
             },
         )
+    }
+}
+
+private enum class Clock { REMINDER, ALERT }
+
+/** A big tappable time, used for the reminder and for the SMS alert. */
+@Composable
+private fun ClockBox(time: String, description: String, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(p.surface)
+            .border(1.dp, p.line, RoundedCornerShape(28.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 18.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(time, style = MaterialTheme.typography.displayMedium, color = p.pine)
     }
 }
 

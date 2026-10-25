@@ -58,7 +58,10 @@
     <string name="next_day">Next day</string>
     <string name="monthly_short_hint">In shorter months, the last day is used.</string>
     <string name="section_forget">If I forget?</string>
-    <string name="delay_line">A text goes out after %1$s without an answer.</string>
+    <string name="alert_cd">Alert time: %1$s. Tap to change.</string>
+    <string name="alert_explain">If not confirmed by then, a text goes out.</string>
+    <string name="alert_gap">That\'s %1$s after the reminder.</string>
+    <string name="alert_gap_next_day">That\'s the next day, %1$s after the reminder.</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d min</string>

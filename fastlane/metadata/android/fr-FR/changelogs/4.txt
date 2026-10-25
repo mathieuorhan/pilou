@@ -1,0 +1,1 @@
+L'alerte SMS se règle maintenant avec une heure, comme le rappel.

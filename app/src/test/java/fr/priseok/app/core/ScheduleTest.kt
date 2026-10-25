@@ -64,6 +64,24 @@ class ScheduleTest {
         assertEquals(at(2026, 3, 11, 1), Schedule.deadline(s, at(2026, 3, 10, 22)))
     }
 
+    // ---- alert chosen as a time of day ----
+
+    @Test fun alertTimeLaterSameDay() =
+        assertEquals(120, Schedule.delayForAlertTime(9, 0, 11, 0, Frequency.DAILY))
+
+    @Test fun alertTimeBeforeReminderMeansNextDay() {
+        assertEquals(180, Schedule.delayForAlertTime(22, 0, 1, 0, Frequency.DAILY))
+        assertEquals(1 * 60 to true, Schedule.alertTime(22, 0, 180))
+    }
+
+    @Test fun alertTimeIsClamped() {
+        assertEquals(15, Schedule.delayForAlertTime(9, 0, 9, 5, Frequency.DAILY))
+        assertEquals(24 * 60 - 15, Schedule.delayForAlertTime(9, 0, 9, 0, Frequency.DAILY)) // same time, daily
+        assertEquals(24 * 60, Schedule.delayForAlertTime(9, 0, 9, 0, Frequency.WEEKLY))
+    }
+
+    @Test fun alertFollowsTheReminder() = assertEquals((11 * 60 + 30) to false, Schedule.alertTime(9, 30, 120))
+
     // ---- plan: which alarms to set ----
 
     @Test fun beforeReminderOnlyNextReminderIsSet() {

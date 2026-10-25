@@ -67,6 +67,22 @@ object Schedule {
     fun maxDelayMinutes(f: Frequency): Int =
         if (f == Frequency.DAILY) MINUTES_PER_DAY - 15 else MINUTES_PER_DAY
 
+    /**
+     * The delay that makes the SMS go out at [alertHour]:[alertMinute], for a reminder at [hour]:[minute].
+     * An alert time at or before the reminder means the next day.
+     */
+    fun delayForAlertTime(hour: Int, minute: Int, alertHour: Int, alertMinute: Int, f: Frequency): Int {
+        var d = Math.floorMod((alertHour * 60 + alertMinute) - (hour * 60 + minute), MINUTES_PER_DAY)
+        if (d == 0) d = MINUTES_PER_DAY
+        return d.coerceIn(15, maxDelayMinutes(f))
+    }
+
+    /** Minute of the day when the SMS goes out, and whether that is the day after the reminder. */
+    fun alertTime(hour: Int, minute: Int, delayMinutes: Int): Pair<Int, Boolean> {
+        val total = hour * 60 + minute + delayMinutes
+        return (total % MINUTES_PER_DAY) to (total >= MINUTES_PER_DAY)
+    }
+
     fun clampedDelay(s: Settings): Int = s.delayMinutes.coerceIn(15, maxDelayMinutes(s.frequency))
 
     /** The trigger on [date], or null if the schedule has no dose that day. */

@@ -56,7 +56,10 @@
     <string name="next_day">Jour suivant</string>
     <string name="monthly_short_hint">Les mois plus courts, ce sera le dernier jour.</string>
     <string name="section_forget">Si j\'oublie ?</string>
-    <string name="delay_line">Un SMS part au bout de %1$s sans réponse.</string>
+    <string name="alert_cd">Heure de l\'alerte : %1$s. Toucher pour changer.</string>
+    <string name="alert_explain">Sans validation à cette heure-là, un SMS part.</string>
+    <string name="alert_gap">Soit %1$s après le rappel.</string>
+    <string name="alert_gap_next_day">Soit le lendemain, %1$s après le rappel.</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d</string>
