@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import fr.priseok.app.R
+import fr.priseok.app.core.Contact
 import fr.priseok.app.core.Dose
 import fr.priseok.app.core.Frequency
 import fr.priseok.app.core.HomeState
@@ -48,8 +49,10 @@ class Texts(private val ctx: Context) {
         }
     }
 
-    fun contact(name: String) = name.trim().ifEmpty { str(R.string.your_contact) }
-    private fun contactCap(name: String) = name.trim().ifEmpty { str(R.string.your_contact_cap) }
+    /** A contact as shown: the first name, or the number when there is none. */
+    fun contactName(c: Contact) = c.name.trim().ifEmpty { c.phone }
+
+    fun contactNames(cs: List<Contact>) = list(cs.map { contactName(it) })
 
     fun medName(m: Med) = m.name.trim().ifEmpty { str(R.string.med_default) }
 
@@ -92,29 +95,44 @@ class Texts(private val ctx: Context) {
         }
     )
 
-    fun home(h: HomeState, s: Settings, now: ZonedDateTime): HomeText {
+    fun home(h: HomeState, now: ZonedDateTime): HomeText {
         val next = h.next?.let { str(R.string.next_reminder, whenText(it.at, now)) } ?: str(R.string.none_left)
         val target = h.target?.let { time(it.at) } ?: ""
-        val alerts = h.target?.alerts == true
         return when (h.phase) {
             Phase.NOTHING_DUE -> HomeText(str(R.string.nothing_title), next, null)
             Phase.TAKEN -> HomeText(str(R.string.taken_title), str(R.string.taken_at, time(h.takenAt!!)), next)
             Phase.EARLY -> HomeText(str(R.string.early_title), str(R.string.early_line, target), str(R.string.early_hint))
             Phase.DUE -> HomeText(
                 str(R.string.due_title), str(R.string.due_line, target),
-                if (alerts) str(R.string.due_hint, contact(s.contactName), time(h.deadline!!)) else str(R.string.due_hint_quiet),
+                if (h.alertContacts.isEmpty() || h.alertAt == null) str(R.string.due_hint_quiet)
+                else str(
+                    if (h.alertContacts.size == 1) R.string.due_hint else R.string.due_hint_many,
+                    contactNames(h.alertContacts), time(h.alertAt),
+                ),
             )
             Phase.MISSED -> HomeText(
                 str(R.string.missed_title),
                 when {
                     h.smsAt != null && h.smsFailed -> str(R.string.missed_sms_failed)
-                    h.smsAt != null -> str(R.string.missed_sms_sent, contactCap(s.contactName), time(h.smsAt))
+                    h.smsAt != null -> str(
+                        if (h.smsContacts.size == 1) R.string.missed_sms_sent else R.string.missed_sms_sent_many,
+                        contactNames(h.smsContacts).replaceFirstChar { it.titlecase(locale) }, time(h.smsAt),
+                    )
                     else -> str(R.string.missed_no_sms, target)
                 },
                 str(R.string.missed_hint),
             )
         }
     }
+
+    /** Under a medication in the settings: until when, who is alerted, paused. */
+    fun medDetails(m: Med, s: Settings): String = listOfNotNull(
+        m.endDate?.let { until(it) },
+        s.contacts.filter { it.id in m.contactIds }.let { cs ->
+            if (cs.isEmpty()) str(R.string.med_no_alert) else str(R.string.alerts_to, contactNames(cs))
+        },
+        str(R.string.paused).takeIf { m.paused },
+    ).joinToString(" · ")
 }
 
 /** [Texts] for the current screen; rebuilt when the language or configuration changes. */

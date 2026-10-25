@@ -21,8 +21,6 @@
     <string name="missed_sms_failed">The alert text could not be sent.</string>
     <string name="missed_no_sms">The deadline for the %1$s dose has passed.</string>
     <string name="missed_hint">You can still confirm.</string>
-    <string name="your_contact">your contact</string>
-    <string name="your_contact_cap">Your contact</string>
     <string name="history_days">The last few days</string>
     <string name="history_weeks">The last few weeks</string>
     <string name="history_months">The last few months</string>
@@ -53,6 +51,13 @@
     <string name="row_upcoming">Coming up</string>
     <string name="row_confirm">Taken</string>
     <string name="row_confirm_cd">Confirm the %1$s dose</string>
+    <string name="due_hint_many">No answer and %1$s get a text at %2$s.</string>
+    <string name="missed_sms_sent_many">%1$s got the alert by text at %2$s.</string>
+    <string name="undo">Undo</string>
+    <string name="undo_title">Marked as taken</string>
+    <string name="snooze_button">In 15 min</string>
+    <string name="med_taken_cd">%1$s: taken</string>
+    <string name="med_confirm_cd">Confirm %1$s only</string>
 
     <!-- Mascot, for screen readers -->
     <string name="mascot_waiting">Pilou is waiting. Tap it to confirm the dose.</string>
@@ -62,15 +67,11 @@
 
     <!-- Settings -->
     <string name="welcome_title">Welcome!</string>
-    <string name="welcome_text">I\'m Pilou. Add what you take and who to tell, and you\'re set. I\'ll ask at the right times, without a sound.</string>
+    <string name="welcome_text">I\'m Pilou. Tell me what you take, and who to tell if you forget. I\'ll ask at the right times, without a sound.</string>
     <string name="section_meds">What to take?</string>
     <string name="add_med">Add a medication</string>
     <string name="med_no_alert">No alert</string>
     <string name="med_edit_cd">Edit %1$s</string>
-    <string name="delay_line">If a dose isn\'t confirmed within %1$s, a text goes out.</string>
-    <string name="delay_less">Shorter</string>
-    <string name="delay_more">Longer</string>
-    <string name="delay_only_alert">Only for medications with the alert on.</string>
     <string name="med_new">New medication</string>
     <string name="med_title">Medication</string>
     <string name="med_name">Name and dose (optional)</string>
@@ -84,10 +85,34 @@
     <string name="no_end">No end</string>
     <string name="until_toggle">Until a date</string>
     <string name="last_day">Last day: %1$s</string>
-    <string name="alert_switch">Text my contact if it\'s missed</string>
     <string name="done">Done</string>
     <string name="remove_med">Remove this medication</string>
-    <string name="section_when">When?</string>
+    <string name="add_contact">Add a contact</string>
+    <string name="contact_title">Contact</string>
+    <string name="contact_new">New contact</string>
+    <string name="contacts_none">Nobody yet: Pilou will only remind.</string>
+    <string name="contact_edit_cd">Edit %1$s</string>
+    <string name="remove">Remove</string>
+    <string name="alerts_to">Alerts %1$s</string>
+    <string name="paused">Paused</string>
+    <string name="section_alert">If it\'s missed?</string>
+    <string name="nobody">Nobody</string>
+    <string name="alert_need_contact">Add a contact in the settings to get alerts.</string>
+    <string name="alert_cd">Alert time: %1$s. Tap to change.</string>
+    <string name="alert_line">%1$s → text at %2$s</string>
+    <string name="alert_line_next_day">%1$s → text at %2$s the next day</string>
+    <string name="alert_explain">The text goes out if the dose isn\'t confirmed by then.</string>
+    <string name="last_day_cd">Last day: %1$s. Tap to change.</string>
+    <plurals name="for_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="for_month">1 month</string>
+    <string name="pause_switch">Pause the reminders</string>
+    <string name="pause_hint">Nothing is asked or sent until you turn this off.</string>
+    <string name="unsaved_title">Save your changes?</string>
+    <string name="discard">Discard</string>
+    <string name="keep_editing">Keep editing</string>
     <string name="time_cd">Reminder time: %1$s. Tap to change.</string>
     <string name="every_day">Every day</string>
     <string name="every_month">Every month</string>
@@ -96,7 +121,6 @@
     <string name="previous_day">Previous day</string>
     <string name="next_day">Next day</string>
     <string name="monthly_short_hint">In shorter months, the last day is used.</string>
-    <string name="section_forget">If I forget?</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d min</string>
@@ -141,6 +165,7 @@
 
     <!-- Text messages (sent to the contact, so keep them under 70 characters) -->
     <string name="sms_alert">Warning! Your contact hasn\'t taken their medication.</string>
+    <string name="sms_alert_named">Warning! Your contact hasn\'t taken: %1$s.</string>
     <string name="sms_test">Pilou test: if you get this, alerts work.</string>
     <string name="sms_not_sent">Text not sent</string>
     <string name="sms_no_number">No contact number is saved.</string>

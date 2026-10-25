@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +36,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.priseok.app.R
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /** Small building blocks shared by the settings and the medication editor. */
 
@@ -126,4 +134,41 @@ internal fun TimeDialog(initial: Int, onPick: (Int) -> Unit, onDismiss: () -> Un
             )
         },
     )
+}
+
+/** The calendar dialog, in Pilou's colors. Days before [firstAllowed] can't be picked. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DateDialog(initial: LocalDate, firstAllowed: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val p = LocalPalette.current
+    // The date picker works in UTC midnights.
+    fun ms(d: LocalDate) = d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = ms(initial),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= ms(firstAllowed)
+            override fun isSelectableYear(year: Int) = year >= firstAllowed.year
+        },
+    )
+    val colors = DatePickerDefaults.colors(
+        containerColor = p.mist,
+        selectedDayContainerColor = p.pine, selectedDayContentColor = p.onPine,
+        todayDateBorderColor = p.pine, todayContentColor = p.pine,
+        dayContentColor = p.pine, weekdayContentColor = p.pineSoft,
+        titleContentColor = p.pineSoft, headlineContentColor = p.pine,
+        navigationContentColor = p.pine, yearContentColor = p.pine,
+        selectedYearContainerColor = p.pine, selectedYearContentColor = p.onPine,
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        colors = colors,
+        confirmButton = {
+            TextButton(onClick = {
+                state.selectedDateMillis?.let { onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) } ?: onDismiss()
+            }) { Text(stringResource(R.string.ok), color = p.pine) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = p.pineSoft) } },
+    ) {
+        DatePicker(state, colors = colors, showModeToggle = false)
+    }
 }

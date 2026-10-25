@@ -4,8 +4,10 @@ import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import fr.priseok.app.core.Schedule
+import java.time.ZoneId
 
-/** Handles the three alarm-driven events: reminder, SMS deadline, and the notification button. */
+/** Handles the alarm-driven events (reminder, text deadline) and the notification buttons. */
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         val cycle = intent.getLongExtra(Alarms.EXTRA_CYCLE, 0L)
@@ -13,18 +15,27 @@ class ReminderReceiver : BroadcastReceiver() {
         val store = Store(ctx)
         when (intent.action) {
             Alarms.ACTION_REMIND -> {
-                // Skip the question if the dose was already confirmed early.
-                if (store.history()[cycle]?.takenAt == null) Notifier.showReminder(ctx, cycle)
+                // Skip the question if the dose was already confirmed early, or no longer exists.
+                val dose = Schedule.doseAt(store.settings(), cycle, ZoneId.systemDefault())
+                if (dose != null && store.history()[cycle]?.isTaken(dose) != true) Notifier.showReminder(ctx, cycle)
                 // An alarm never fires early, but guard anyway so this cycle counts as "current".
                 Alarms.reschedule(ctx, maxOf(now, cycle))
             }
-            Alarms.ACTION_DEADLINE -> {
-                Sms.sendAlert(ctx, cycle)
+            Alarms.ACTION_DEADLINE -> Alarms.reschedule(ctx) // sends what is due
+            Alarms.ACTION_CONFIRM -> {
+                if (cycle < 0) { Notifier.cancelReminder(ctx, cycle); return } // test notification
+                store.saveUndo(cycle)
+                store.markTaken(cycle, now)
+                Notifier.showUndo(ctx, cycle)
                 Alarms.reschedule(ctx)
             }
-            Alarms.ACTION_CONFIRM -> {
-                if (cycle > 0) store.markTaken(cycle, now) // cycle -1 = test notification
+            Alarms.ACTION_SNOOZE -> {
                 Notifier.cancelReminder(ctx, cycle)
+                Alarms.snooze(ctx, cycle)
+            }
+            Alarms.ACTION_UNDO -> {
+                store.undo(cycle)
+                Notifier.showReminder(ctx, cycle)
                 Alarms.reschedule(ctx)
             }
         }
@@ -46,7 +57,7 @@ class SmsResultReceiver : BroadcastReceiver() {
         }
         val cycle = intent.getLongExtra(Alarms.EXTRA_CYCLE, 0L)
         if (!ok) {
-            Store(ctx).update(cycle) { it.copy(smsFailed = true) }
+            Store(ctx).recordSmsFailed(cycle, intent.getLongExtra(Sms.EXTRA_CONTACT, 0L))
             Notifier.info(ctx, R.string.sms_alert_failed_title, ctx.getString(R.string.sms_alert_failed_text))
         }
     }

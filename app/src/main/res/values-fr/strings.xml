@@ -19,8 +19,6 @@
     <string name="missed_sms_failed">Le SMS d\'alerte n\'a pas pu partir.</string>
     <string name="missed_no_sms">Le délai de %1$s est passé.</string>
     <string name="missed_hint">Tu peux quand même valider.</string>
-    <string name="your_contact">ton contact</string>
-    <string name="your_contact_cap">Ton contact</string>
     <string name="history_days">Les derniers jours</string>
     <string name="history_weeks">Les dernières semaines</string>
     <string name="history_months">Les derniers mois</string>
@@ -52,6 +50,13 @@
     <string name="row_upcoming">À venir</string>
     <string name="row_confirm">Pris</string>
     <string name="row_confirm_cd">Valider la prise de %1$s</string>
+    <string name="due_hint_many">Sans réponse, %1$s reçoivent un SMS à %2$s.</string>
+    <string name="missed_sms_sent_many">%1$s ont reçu l\'alerte par SMS à %2$s.</string>
+    <string name="undo">Annuler</string>
+    <string name="undo_title">Noté comme pris</string>
+    <string name="snooze_button">Dans 15 min</string>
+    <string name="med_taken_cd">%1$s : pris</string>
+    <string name="med_confirm_cd">Valider seulement %1$s</string>
 
     <!-- Mascotte, pour les lecteurs d'écran -->
     <string name="mascot_waiting">Pilou attend. Touche-le pour valider la prise.</string>
@@ -61,15 +66,11 @@
 
     <!-- Réglages -->
     <string name="welcome_title">Bienvenue !</string>
-    <string name="welcome_text">Moi, c\'est Pilou. Dis-moi ce que tu prends et qui prévenir, et c\'est parti. Je te poserai la question aux bonnes heures, sans bruit.</string>
+    <string name="welcome_text">Moi, c\'est Pilou. Dis-moi ce que tu prends, et qui prévenir en cas d\'oubli. Je te poserai la question aux bonnes heures, sans bruit.</string>
     <string name="section_meds">Quoi prendre ?</string>
     <string name="add_med">Ajouter un médicament</string>
     <string name="med_no_alert">Sans alerte</string>
     <string name="med_edit_cd">Modifier %1$s</string>
-    <string name="delay_line">Sans validation dans les %1$s, un SMS part.</string>
-    <string name="delay_less">Plus court</string>
-    <string name="delay_more">Plus long</string>
-    <string name="delay_only_alert">Seulement pour les médicaments avec l\'alerte.</string>
     <string name="med_new">Nouveau médicament</string>
     <string name="med_title">Médicament</string>
     <string name="med_name">Nom et dose (facultatif)</string>
@@ -83,10 +84,35 @@
     <string name="no_end">Sans fin</string>
     <string name="until_toggle">Jusqu\'à une date</string>
     <string name="last_day">Dernier jour : %1$s</string>
-    <string name="alert_switch">Prévenir mon contact en cas d\'oubli</string>
     <string name="done">Valider</string>
     <string name="remove_med">Supprimer ce médicament</string>
-    <string name="section_when">Quand ?</string>
+    <string name="add_contact">Ajouter un contact</string>
+    <string name="contact_title">Contact</string>
+    <string name="contact_new">Nouveau contact</string>
+    <string name="contacts_none">Personne pour l\'instant : Pilou fera seulement les rappels.</string>
+    <string name="contact_edit_cd">Modifier %1$s</string>
+    <string name="remove">Supprimer</string>
+    <string name="alerts_to">Alerte %1$s</string>
+    <string name="paused">En pause</string>
+    <string name="section_alert">En cas d\'oubli ?</string>
+    <string name="nobody">Personne</string>
+    <string name="alert_need_contact">Ajoute un contact dans les réglages pour avoir des alertes.</string>
+    <string name="alert_cd">Heure de l\'alerte : %1$s. Toucher pour changer.</string>
+    <string name="alert_line">%1$s → SMS à %2$s</string>
+    <string name="alert_line_next_day">%1$s → SMS à %2$s le lendemain</string>
+    <string name="alert_explain">Le SMS part si la prise n\'est pas validée d\'ici là.</string>
+    <string name="last_day_cd">Dernier jour : %1$s. Toucher pour changer.</string>
+    <plurals name="for_days">
+        <item quantity="one">%d jour</item>
+        <item quantity="many">%d jours</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <string name="for_month">1 mois</string>
+    <string name="pause_switch">Mettre les rappels en pause</string>
+    <string name="pause_hint">Rien n\'est demandé ni envoyé tant que c\'est activé.</string>
+    <string name="unsaved_title">Enregistrer les modifications ?</string>
+    <string name="discard">Ne pas enregistrer</string>
+    <string name="keep_editing">Continuer</string>
     <string name="time_cd">Heure du rappel : %1$s. Toucher pour changer.</string>
     <string name="every_day">Chaque jour</string>
     <string name="every_month">Chaque mois</string>
@@ -95,7 +121,6 @@
     <string name="previous_day">Jour précédent</string>
     <string name="next_day">Jour suivant</string>
     <string name="monthly_short_hint">Les mois plus courts, ce sera le dernier jour.</string>
-    <string name="section_forget">Si j\'oublie ?</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d</string>
@@ -141,6 +166,7 @@
 
     <!-- SMS (envoyés au contact : moins de 70 caractères) -->
     <string name="sms_alert">Attention ! Ton contact n\'a pas pris son médicament.</string>
+    <string name="sms_alert_named">Attention ! Ton contact n\'a pas pris : %1$s.</string>
     <string name="sms_test">Test Pilou : si tu reçois ce message, les alertes fonctionnent.</string>
     <string name="sms_not_sent">SMS non envoyé</string>
     <string name="sms_no_number">Aucun numéro de contact n\'est enregistré.</string>

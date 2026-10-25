@@ -10,13 +10,17 @@ import java.time.ZonedDateTime
 /**
  * Pure scheduling logic, no Android dependency, so it can be unit-tested on the JVM.
  *
- * Each medication has its own times and days. Medications due at the same moment are grouped
- * into one [Dose]: one reminder, one confirmation. A dose is identified by its "cycle",
- * the epoch millis of its trigger time, which is also the key of its history [Entry].
+ * Each medication has its own times, days, alert delay and contacts. Medications due at the
+ * same moment are grouped into one [Dose]: one reminder, one big "taken" button (each medication
+ * can also be confirmed on its own). A dose is identified by its "cycle", the epoch millis of its
+ * trigger time, which is also the key of its history [Entry].
  */
 
 /** How often a medication repeats. WEEKLY = on the chosen days of the week. */
 enum class Frequency { DAILY, WEEKLY, MONTHLY }
+
+/** Someone who gets a text when a dose is missed. */
+data class Contact(val id: Long, val name: String = "", val phone: String = "")
 
 data class Med(
     /** Stable identifier, kept across edits. */
@@ -30,18 +34,27 @@ data class Med(
     val daysOfWeek: Set<Int> = setOf(1),
     /** 1..31. Months shorter than this use their last day. Used when frequency = MONTHLY. */
     val dayOfMonth: Int = 1,
-    /** Whether a missed dose of this medication texts the contact. */
-    val alert: Boolean = true,
+    /** Time after each dose before the contacts get a text. Shown as a time of day in the editor. */
+    val delayMinutes: Int = 120,
+    /** Who gets a text if a dose is missed. Empty = no alert. */
+    val contactIds: Set<Long> = emptySet(),
     /** Last day of a course of treatment, inclusive. Null = no end. */
     val endDate: LocalDate? = null,
+    /** Reminders stopped for now, without deleting the medication. */
+    val paused: Boolean = false,
     /** Epoch millis when this medication's schedule was last set. Earlier doses are ignored. */
     val activeSince: Long = 0L,
 ) {
+    val alerts: Boolean get() = contactIds.isNotEmpty()
+
+    /** Changes that make earlier doses no longer comparable: they restart the medication's history. */
     fun sameScheduleAs(o: Med): Boolean =
-        times == o.times && frequency == o.frequency && daysOfWeek == o.daysOfWeek && dayOfMonth == o.dayOfMonth
+        times == o.times && frequency == o.frequency && daysOfWeek == o.daysOfWeek &&
+            dayOfMonth == o.dayOfMonth && paused == o.paused
 
     /** Whether the schedule has a dose on [date] (end date included, start ignored). */
     fun takenOn(date: LocalDate): Boolean {
+        if (paused) return false
         if (endDate != null && date.isAfter(endDate)) return false
         return when (frequency) {
             Frequency.DAILY -> true
@@ -53,58 +66,90 @@ data class Med(
 
 data class Settings(
     val meds: List<Med> = emptyList(),
-    /** Time after a dose before the text goes out. */
-    val delayMinutes: Int = 120,
-    val contactName: String = "",
-    val phone: String = "",
+    val contacts: List<Contact> = emptyList(),
 ) {
     val isConfigured: Boolean get() = meds.isNotEmpty()
-    val needsPhone: Boolean get() = meds.any { it.alert }
+    /** Whether any text may ever be sent, i.e. the SMS permission is worth asking for. */
+    val sendsTexts: Boolean get() = meds.any { m -> m.contactIds.any { id -> contacts.any { it.id == id } } }
+    fun contact(id: Long): Contact? = contacts.find { it.id == id }
 }
 
 /** One moment when one or more medications are due. */
 data class Dose(val at: ZonedDateTime, val meds: List<Med>) {
     val cycle: Long get() = at.toInstant().toEpochMilli()
-    val alerts: Boolean get() = meds.any { it.alert }
+    val alerts: Boolean get() = meds.any { it.alerts }
 }
 
+/** What happened to one dose. Keyed by its cycle. */
 data class Entry(
     val cycle: Long,
+    /** The whole dose was confirmed at this time. */
     val takenAt: Long? = null,
-    val smsAt: Long? = null,
-    val smsFailed: Boolean = false,
-)
+    /** Medications confirmed one by one: med id -> time. */
+    val medsTaken: Map<Long, Long> = emptyMap(),
+    /** Texts sent: contact id -> time. */
+    val sms: Map<Long, Long> = emptyMap(),
+    /** Contacts whose text could not be sent. */
+    val smsFailed: Set<Long> = emptySet(),
+) {
+    fun isTaken(medId: Long): Boolean = takenAt != null || medId in medsTaken
+
+    /** Whether every medication of [d] is confirmed. */
+    fun isTaken(d: Dose): Boolean = takenAt != null || d.meds.all { it.id in medsTaken }
+
+    /** When the dose became fully confirmed, or null. */
+    fun takenTime(d: Dose): Long? = takenAt ?: if (isTaken(d)) d.meds.maxOf { medsTaken.getValue(it.id) } else null
+}
 
 enum class CycleStatus { TAKEN, PENDING, MISSED }
 
+/** One text to send: about the dose at [cycle], to [contactId]. */
+data class Alert(val cycle: Long, val contactId: Long, val at: Long)
+
 /** What the alarm layer must do now. All times are epoch millis. */
 data class Plan(
-    /** Null when no dose is left (every course has ended). */
+    /** Null when no dose is left (every course has ended or is paused). */
     val nextReminder: Long?,
-    val deadlineCycle: Long?,
-    val deadlineAt: Long?,
-    /** Deadlines that passed while the phone was off: send these texts right away. */
-    val sendSmsNowFor: List<Long>,
+    /** The next time a text becomes due. Null if none is pending. */
+    val nextAlertAt: Long?,
+    /** Texts due now, including those that came due while the phone was off. */
+    val sendNow: List<Alert>,
 )
 
 object Schedule {
     const val MINUTES_PER_DAY = 24 * 60
     const val MIN_DELAY = 15
-    const val MAX_DELAY = MINUTES_PER_DAY
-    /** The delays offered in the settings, in minutes. */
-    val DELAYS = listOf(15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600, 720, 960, 1200, 1440)
     /** Validating up to this long before the reminder counts for the upcoming dose. */
     const val EARLY_WINDOW_MINUTES = 180L
     /** A missed deadline older than this (phone off for long) no longer triggers a late text. */
     const val LATE_SMS_LIMIT_HOURS = 12L
     private const val SEARCH_DAYS = 400L
 
-    fun clampedDelay(s: Settings): Int = s.delayMinutes.coerceIn(MIN_DELAY, MAX_DELAY)
+    /** The alert must come before the medication's next dose of the day, at the latest. */
+    fun maxDelayMinutes(m: Med): Int {
+        if (m.times.size == 1 && m.frequency != Frequency.DAILY) return MINUTES_PER_DAY
+        // Gaps between consecutive times, including from the last one to the first one the next day.
+        val gaps = m.times.zipWithNext { a, b -> b - a } + (m.times.first() + MINUTES_PER_DAY - m.times.last())
+        return (gaps.min() - MIN_DELAY).coerceAtLeast(MIN_DELAY)
+    }
 
-    /** The next or previous offered delay, from any current value. */
-    fun stepDelay(current: Int, up: Boolean): Int =
-        if (up) DELAYS.firstOrNull { it > current } ?: DELAYS.last()
-        else DELAYS.lastOrNull { it < current } ?: DELAYS.first()
+    fun clampedDelay(m: Med): Int = m.delayMinutes.coerceIn(MIN_DELAY, maxDelayMinutes(m))
+
+    /**
+     * The delay that makes the text go out at [alertMinute] (minute of the day), for a dose at [doseMinute].
+     * An alert time at or before the dose means the next day.
+     */
+    fun delayForAlertTime(m: Med, doseMinute: Int, alertMinute: Int): Int {
+        var d = Math.floorMod(alertMinute - doseMinute, MINUTES_PER_DAY)
+        if (d == 0) d = MINUTES_PER_DAY
+        return d.coerceIn(MIN_DELAY, maxDelayMinutes(m))
+    }
+
+    /** Minute of the day when the text goes out, and whether that is the day after the dose. */
+    fun alertTime(doseMinute: Int, delayMinutes: Int): Pair<Int, Boolean> {
+        val total = doseMinute + delayMinutes
+        return (total % MINUTES_PER_DAY) to (total >= MINUTES_PER_DAY)
+    }
 
     /** The doses on [date], in time order. */
     fun dosesOn(s: Settings, date: LocalDate, zone: ZoneId): List<Dose> {
@@ -128,8 +173,11 @@ object Schedule {
     private fun firstDay(s: Settings, zone: ZoneId): LocalDate? =
         s.meds.minOfOrNull { it.activeSince }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
 
-    private fun lastDay(s: Settings): LocalDate? =
-        if (s.meds.any { it.endDate == null }) null else s.meds.mapNotNull { it.endDate }.maxOrNull()
+    private fun lastDay(s: Settings): LocalDate? {
+        val active = s.meds.filter { !it.paused }
+        if (active.isEmpty()) return LocalDate.MIN
+        return if (active.any { it.endDate == null }) null else active.mapNotNull { it.endDate }.maxOrNull()
+    }
 
     /** First dose strictly after [now], or null if none is left. */
     fun after(s: Settings, now: ZonedDateTime): Dose? {
@@ -186,17 +234,22 @@ object Schedule {
         return out.reversed()
     }
 
-    fun deadline(s: Settings, trigger: ZonedDateTime): ZonedDateTime =
-        trigger.plusMinutes(clampedDelay(s).toLong()) // instant-based: a real 2 h, even across DST
+    /** When a dose counts as missed: its earliest medication deadline. */
+    fun deadline(d: Dose): ZonedDateTime = d.at.plusMinutes(d.meds.minOf { clampedDelay(it) }.toLong())
 
-    fun deadline(s: Settings, cycle: Long, zone: ZoneId): ZonedDateTime =
-        deadline(s, Instant.ofEpochMilli(cycle).atZone(zone))
+    /** When [contactId] gets a text for [d], if [entry]'s confirmations leave anything of theirs open. */
+    fun alertTime(d: Dose, contactId: Long, entry: Entry?): ZonedDateTime? =
+        d.meds.filter { contactId in it.contactIds && entry?.isTaken(it.id) != true }
+            .minOfOrNull { clampedDelay(it) }
+            ?.let { d.at.plusMinutes(it.toLong()) }
 
-    fun status(s: Settings, cycle: Long, entry: Entry?, now: ZonedDateTime): CycleStatus = when {
-        entry?.takenAt != null -> CycleStatus.TAKEN
-        now.isAfter(deadline(s, cycle, now.zone)) -> CycleStatus.MISSED
+    fun status(d: Dose, entry: Entry?, now: ZonedDateTime): CycleStatus = when {
+        entry?.isTaken(d) == true -> CycleStatus.TAKEN
+        now.isAfter(deadline(d)) -> CycleStatus.MISSED
         else -> CycleStatus.PENDING
     }
+
+    private fun longestDelay(s: Settings): Long = (s.meds.maxOfOrNull { clampedDelay(it) } ?: 0).toLong()
 
     /**
      * The dose the "I took it" button applies to, in this order:
@@ -206,8 +259,8 @@ object Schedule {
      */
     fun target(s: Settings, history: Map<Long, Entry>, now: ZonedDateTime): Dose? {
         if (!s.isConfigured) return null
-        val window = now.minusMinutes(clampedDelay(s).toLong())
-        between(s, window, now).firstOrNull { history[it.cycle]?.takenAt == null && deadline(s, it.at).isAfter(now) }
+        between(s, now.minusMinutes(longestDelay(s)), now)
+            .firstOrNull { history[it.cycle]?.isTaken(it) != true && deadline(it).isAfter(now) }
             ?.let { return it }
         val next = after(s, now)
         if (next != null && Duration.between(now, next.at).toMinutes() < EARLY_WINDOW_MINUTES) return next
@@ -219,22 +272,24 @@ object Schedule {
 
     fun plan(s: Settings, now: ZonedDateTime, history: Map<Long, Entry>): Plan {
         val next = after(s, now)?.cycle
-        var deadlineCycle: Long? = null
-        var deadlineAt: Long? = null
-        val late = ArrayList<Long>()
-        // Every dose whose deadline is still ahead, or passed less than LATE_SMS_LIMIT_HOURS ago.
-        val from = now.minusMinutes(clampedDelay(s).toLong()).minusHours(LATE_SMS_LIMIT_HOURS)
+        val nowMs = now.toInstant().toEpochMilli()
+        var nextAlert: Long? = null
+        val due = ArrayList<Alert>()
+        // Every dose whose texts are still ahead, or came due less than LATE_SMS_LIMIT_HOURS ago.
+        val from = now.minusMinutes(longestDelay(s)).minusHours(LATE_SMS_LIMIT_HOURS)
         for (d in between(s, from, now)) {
             val e = history[d.cycle]
-            if (!d.alerts || e?.takenAt != null || e?.smsAt != null) continue
-            val dl = deadline(s, d.at)
-            val dlMs = dl.toInstant().toEpochMilli()
-            if (dl.isAfter(now)) {
-                if (deadlineAt == null || dlMs < deadlineAt) { deadlineAt = dlMs; deadlineCycle = d.cycle }
-            } else if (Duration.between(dl, now).toHours() < LATE_SMS_LIMIT_HOURS) {
-                late.add(d.cycle)
+            for (c in s.contacts) {
+                if (e?.sms?.containsKey(c.id) == true) continue
+                val at = alertTime(d, c.id, e) ?: continue
+                val atMs = at.toInstant().toEpochMilli()
+                if (atMs > nowMs) {
+                    if (nextAlert == null || atMs < nextAlert) nextAlert = atMs
+                } else if (Duration.between(at, now).toHours() < LATE_SMS_LIMIT_HOURS) {
+                    due.add(Alert(d.cycle, c.id, atMs))
+                }
             }
         }
-        return Plan(next, deadlineCycle, deadlineAt, late)
+        return Plan(next, nextAlert, due)
     }
 }

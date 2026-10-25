@@ -4,7 +4,8 @@
 <li>Medications due at the same time are grouped into one reminder</li>
 <li>Silent notification, no sound or vibration</li>
 <li>"Yes, I took it" button right in the notification, or in the app</li>
-<li>If there is no answer after the chosen delay (up to 24 h), an SMS is sent automatically to a loved one. The alert can be turned off per medication.</li>
+<li>If there is no answer after the chosen delay (up to 24 h), an SMS is sent automatically to the people you chose for that medication, or to nobody</li>
+<li>"In 15 min" button in the notification, undo after confirming, and pause for a medication</li>
 <li>History of recent doses</li>
 </ul>
 <p>No account, no internet access, no ads. Data stays on the phone.</p>
