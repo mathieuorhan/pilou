@@ -36,6 +36,7 @@ import fr.priseok.app.ui.PriseTheme
 import fr.priseok.app.ui.SettingsScreen
 import fr.priseok.app.ui.hasPermission
 import fr.priseok.app.ui.historyItems
+import fr.priseok.app.ui.todayItems
 import fr.priseok.app.ui.rememberTexts
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
@@ -110,18 +111,20 @@ private fun App() {
             val history = store.history()
             val tx = rememberTexts()
             val home = Home.state(settings, history, now)
+            val (scale, past) = historyItems(settings, history, now, tx.locale)
             HomeScreen(
                 phase = home.phase,
                 text = tx.home(home, settings, now),
                 confirmCycle = home.confirmCycle,
-                frequencyText = tx.frequency(settings),
-                historyTitle = tx.historyTitle(settings.frequency),
-                history = historyItems(settings, history, now, tx.locale),
+                header = tx.header(settings),
+                today = todayItems(settings, history, now, home.confirmCycle, tx),
+                historyTitle = tx.historyTitle(scale),
+                history = past,
                 celebrate = celebrate,
                 permissions = { PermissionsCard(refreshKey = tick, onChanged = { tick++; Alarms.reschedule(ctx) }) },
                 onConfirm = { cycle ->
                     store.markTaken(cycle, System.currentTimeMillis())
-                    Notifier.cancelReminder(ctx)
+                    Notifier.cancelReminder(ctx, cycle)
                     Alarms.reschedule(ctx)
                     celebrate++
                 },

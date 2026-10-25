@@ -12,7 +12,8 @@ import java.time.ZonedDateTime
 
 /**
  * Turns the pure [Schedule.plan] into real alarms.
- * Two alarms at most are ever pending: the next reminder, and the SMS deadline of the current dose.
+ * Two alarms at most are ever pending: the next reminder, and the earliest text deadline.
+ * When that deadline fires, rescheduling arms the next one.
  */
 object Alarms {
     const val ACTION_REMIND = "fr.priseok.app.REMIND"
@@ -22,7 +23,9 @@ object Alarms {
 
     private const val RC_REMIND = 1
     private const val RC_DEADLINE = 2
-    const val RC_CONFIRM = 3
+
+    /** A request code per dose, so the buttons of two open reminders don't overwrite each other. */
+    fun confirmCode(cycle: Long): Int = if (cycle < 0) 3 else 1000 + ((cycle / 60_000) % 1_000_000).toInt()
 
     fun canScheduleExact(ctx: Context): Boolean {
         val am = ctx.getSystemService(AlarmManager::class.java)
@@ -49,13 +52,17 @@ object Alarms {
         val now = ZonedDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), ZoneId.systemDefault())
         val plan = Schedule.plan(s, now, store.history())
 
-        setExact(ctx, am, plan.nextReminder, intent(ctx, ACTION_REMIND, plan.nextReminder, RC_REMIND))
+        if (plan.nextReminder != null) {
+            setExact(ctx, am, plan.nextReminder, intent(ctx, ACTION_REMIND, plan.nextReminder, RC_REMIND))
+        } else {
+            am.cancel(intent(ctx, ACTION_REMIND, 0, RC_REMIND))
+        }
         if (plan.deadlineAt != null && plan.deadlineCycle != null) {
             setExact(ctx, am, plan.deadlineAt, intent(ctx, ACTION_DEADLINE, plan.deadlineCycle, RC_DEADLINE))
         } else {
             am.cancel(intent(ctx, ACTION_DEADLINE, 0, RC_DEADLINE))
         }
-        plan.sendSmsNowFor?.let { Sms.sendAlert(ctx, it) }
+        plan.sendSmsNowFor.forEach { Sms.sendAlert(ctx, it) }
     }
 
     private fun setExact(ctx: Context, am: AlarmManager, at: Long, pi: PendingIntent) {

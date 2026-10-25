@@ -42,7 +42,8 @@ object Sms {
         }
         return try {
             val sent = PendingIntent.getBroadcast(
-                ctx, if (test) 21 else 20,
+                // One request code per dose, so two texts in a row each report their own result.
+                ctx, if (test) 21 else 20_000_000 + Alarms.confirmCode(cycle),
                 Intent(ctx, SmsResultReceiver::class.java)
                     .putExtra(Alarms.EXTRA_CYCLE, cycle)
                     .putExtra(EXTRA_TEST, test),

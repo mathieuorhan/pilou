@@ -24,7 +24,7 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             Alarms.ACTION_CONFIRM -> {
                 if (cycle > 0) store.markTaken(cycle, now) // cycle -1 = test notification
-                Notifier.cancelReminder(ctx)
+                Notifier.cancelReminder(ctx, cycle)
                 Alarms.reschedule(ctx)
             }
         }

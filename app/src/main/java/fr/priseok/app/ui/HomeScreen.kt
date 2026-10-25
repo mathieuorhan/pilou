@@ -40,19 +40,41 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.priseok.app.R
 import fr.priseok.app.core.CycleStatus
+import fr.priseok.app.core.Entry
+import fr.priseok.app.core.Home
 import fr.priseok.app.core.Phase
+import fr.priseok.app.core.Schedule
+import fr.priseok.app.core.Settings
 import fr.priseok.app.core.Wording
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import java.time.LocalDate
 import androidx.compose.ui.res.stringResource
 import java.time.ZonedDateTime
 
-data class HistoryItem(val label: String, val status: CycleStatus, val time: ZonedDateTime)
+data class HistoryItem(val label: String, val status: CycleStatus, val date: LocalDate)
+
+/** A line of today's list, ready to show. [status] null = still to come. */
+data class TodayItem(
+    val time: String,
+    val names: String,
+    val status: CycleStatus?,
+    val detail: String,
+    /** The dose this line's own button confirms. Null = no button. */
+    val confirmCycle: Long?,
+)
 
 @Composable
 fun HomeScreen(
     phase: Phase,
     text: HomeText,
     confirmCycle: Long?,
-    frequencyText: String,
+    header: String,
+    today: List<TodayItem>,
     historyTitle: String,
     history: List<HistoryItem>,
     celebrate: Int,
@@ -78,7 +100,7 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = p.pine)
-                Text(frequencyText, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
+                Text(header, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
             }
             IconButton(onClick = onSettings) {
                 Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings), tint = p.pine)
@@ -125,6 +147,16 @@ fun HomeScreen(
 
         permissions()
 
+        if (today.size > 1) {
+            Spacer(Modifier.height(32.dp))
+            Text(
+                stringResource(R.string.today_title), style = MaterialTheme.typography.titleMedium, color = p.pine,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            today.forEach { TodayRow(it, onConfirm) }
+        }
+
         if (history.isNotEmpty()) {
             Spacer(Modifier.height(32.dp))
             Text(
@@ -144,6 +176,43 @@ fun HomeScreen(
             }
         }
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun TodayRow(item: TodayItem, onConfirm: (Long) -> Unit) {
+    val p = LocalPalette.current
+    val color = when (item.status) {
+        CycleStatus.TAKEN -> p.leaf
+        CycleStatus.MISSED -> p.coral
+        CycleStatus.PENDING -> p.butter
+        null -> p.line
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(p.surface)
+            .border(1.dp, p.line, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(width = 8.dp, height = 36.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("${item.time} · ${item.names}", style = MaterialTheme.typography.bodyLarge, color = p.pine)
+            Text(item.detail, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
+        }
+        item.confirmCycle?.let { c ->
+            Spacer(Modifier.width(8.dp))
+            val cd = stringResource(R.string.row_confirm_cd, item.time)
+            OutlinedButton(
+                onClick = { onConfirm(c) }, shape = CircleShape, border = BorderStroke(1.5.dp, p.pine),
+                modifier = Modifier.semantics { contentDescription = cd },
+            ) { Text(stringResource(R.string.row_confirm), color = p.pine) }
+        }
     }
 }
 
@@ -186,18 +255,40 @@ private fun LegendDot(c: androidx.compose.ui.graphics.Color) {
     }
 }
 
-/** Builds the history row from the schedule. */
+/** Builds the history row: the last days with doses, each one taken, pending or missed as a whole. */
 fun historyItems(
-    s: fr.priseok.app.core.Settings,
-    history: Map<Long, fr.priseok.app.core.Entry>,
+    s: Settings,
+    history: Map<Long, Entry>,
     now: ZonedDateTime,
     locale: java.util.Locale,
-): List<HistoryItem> =
-    fr.priseok.app.core.Schedule.recent(s, now, 7).map { t ->
-        val key = t.toInstant().toEpochMilli()
-        HistoryItem(
-            Wording.historyLabel(s.frequency, t, locale),
-            fr.priseok.app.core.Schedule.status(s, key, history[key], now),
-            t,
-        )
+): Pair<Wording.Scale, List<HistoryItem>> {
+    val days = Schedule.recentDays(s, now, 7)
+    if (days.isEmpty()) return Wording.Scale.DAYS to emptyList()
+    val scale = Wording.scale(days.first().first, days.last().first)
+    return scale to days.map { (date, doses) ->
+        HistoryItem(Wording.historyLabel(scale, date, locale), Home.dayStatus(s, doses, history, now), date)
     }
+}
+
+/** Builds today's list, with the sentences in the phone's language. */
+fun todayItems(
+    s: Settings,
+    history: Map<Long, Entry>,
+    now: ZonedDateTime,
+    bigButtonCycle: Long?,
+    tx: Texts,
+): List<TodayItem> = Home.today(s, history, now, bigButtonCycle).map { r ->
+    TodayItem(
+        time = tx.time(r.dose.at),
+        names = tx.doseNames(r.dose),
+        status = r.status,
+        detail = when {
+            r.takenAt != null -> tx.str(R.string.row_taken_at, tx.time(r.takenAt))
+            r.smsAt != null -> tx.str(R.string.row_sms)
+            r.status == CycleStatus.MISSED -> tx.str(R.string.status_missed).replaceFirstChar { it.titlecase(tx.locale) }
+            r.status == CycleStatus.PENDING -> tx.str(R.string.status_pending).replaceFirstChar { it.titlecase(tx.locale) }
+            else -> tx.str(R.string.row_upcoming)
+        },
+        confirmCycle = if (r.confirmable) r.dose.cycle else null,
+    )
+}

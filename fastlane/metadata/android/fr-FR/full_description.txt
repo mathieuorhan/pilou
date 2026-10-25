@@ -1,9 +1,10 @@
-<p>Pilou pose une seule question, à l'heure choisie : « As-tu pris ton médicament ? »</p>
+<p>Pilou pose une seule question, à chaque prise : « As-tu pris ton médicament ? »</p>
 <ul>
-<li>Rappel chaque jour, chaque semaine ou chaque mois, à l'heure choisie</li>
+<li>Un ou plusieurs médicaments, chacun avec ses heures, ses jours (chaque jour, certains jours ou chaque mois) et une date de fin si besoin</li>
+<li>Les médicaments à prendre à la même heure sont regroupés dans un seul rappel</li>
 <li>Notification silencieuse, sans son ni vibration</li>
 <li>Bouton « Oui, j'ai pris » directement dans la notification, ou dans l'application</li>
-<li>Sans réponse après le délai choisi (jusqu'à 24 h), un SMS part automatiquement vers un proche</li>
+<li>Sans réponse après le délai choisi (jusqu'à 24 h), un SMS part automatiquement vers un proche. L'alerte peut être désactivée médicament par médicament.</li>
 <li>Historique des dernières prises</li>
 </ul>
 <p>Aucun compte, aucune connexion internet, aucune publicité. Les données restent sur le téléphone.</p>
