@@ -30,8 +30,10 @@ class ReceiversTest {
     @Before fun setUp() {
         shadowOf(app).grantPermissions(Manifest.permission.SEND_SMS, Manifest.permission.POST_NOTIFICATIONS)
         store.prefs.edit().clear().commit()
+        // Active from now: the schedule's own past doses are ignored, so rescheduling never sends
+        // a late SMS for them, whatever the time of day the tests run at.
         store.saveSettings(Settings(hour = 9, delayMinutes = 120, contactName = "Camille", phone = "+33639980000",
-            activeSince = System.currentTimeMillis() - 30 * 24 * hour))
+            activeSince = System.currentTimeMillis()))
     }
 
     private fun fire(action: String, cycle: Long) =

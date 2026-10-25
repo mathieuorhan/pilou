@@ -20,6 +20,15 @@ No account, no internet access, no cloud backup.
 Download the APK from [Releases](https://github.com/mathieuorhan/pilou/releases),
 or add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) to get updates.
 
+### Beta
+
+The [beta release](https://github.com/mathieuorhan/pilou/releases/tag/beta) is the latest
+development version. It installs as a separate app, Pilou β, so the stable app stays as it is.
+It may be broken: don't rely on it for an actual medication.
+
+To get its updates in Obtainium, add this repository again with "Include prereleases" on
+and "Filter release titles by regular expression" set to `^Beta`.
+
 ## Build
 
 ```sh

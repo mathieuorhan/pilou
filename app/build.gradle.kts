@@ -10,6 +10,9 @@ plugins {
 val keystoreFile: String? = System.getenv("KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
 val keystorePassword: String? = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
 
+// CI run number for beta builds, so each beta has a higher versionCode than the previous one.
+val betaBuild: Int? = System.getenv("BETA_BUILD")?.toIntOrNull()
+
 android {
     namespace = "fr.priseok.app"
     compileSdk = 35
@@ -40,6 +43,14 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
+        // Beta channel: the latest main, built by CI. Its own package, name and icon,
+        // so it installs next to the stable app instead of replacing it.
+        create("beta") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta" + (betaBuild?.let { ".$it" } ?: "")
+            matchingFallbacks += listOf("release")
+        }
     }
 
     // F-Droid requirement: no Google-signed dependency metadata blob in the APK
@@ -62,6 +73,12 @@ android {
             // Optional Maven mirror for Robolectric's Android jars: -ProbolectricRepo=<url>
             project.findProperty("robolectricRepo")?.let { url -> it.systemProperty("robolectric.dependency.repo.url", url) }
         }
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("beta")) { variant ->
+        betaBuild?.let { code -> variant.outputs.forEach { it.versionCode.set(code) } }
     }
 }
 

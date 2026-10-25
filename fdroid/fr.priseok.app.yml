@@ -21,6 +21,6 @@ Builds:
       - yes
 
 AutoUpdateMode: Version
-UpdateCheckMode: Tags
+UpdateCheckMode: Tags ^v[0-9.]+$
 CurrentVersion: 1.3.0
 CurrentVersionCode: 4
