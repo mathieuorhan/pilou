@@ -1,9 +1,10 @@
-<p>Pilou asks one question at the time you choose: "Did you take your medication?"</p>
+<p>Pilou asks one question at each dose: "Did you take your medication?"</p>
 <ul>
-<li>Daily, weekly or monthly reminder at a set time</li>
+<li>One or several medications, each with its own times, days (every day, some days or monthly) and optional end date</li>
+<li>Medications due at the same time are grouped into one reminder</li>
 <li>Silent notification, no sound or vibration</li>
 <li>"Yes, I took it" button right in the notification, or in the app</li>
-<li>If there is no answer after the chosen delay (up to 24 h), an SMS is sent automatically to a loved one</li>
+<li>If there is no answer after the chosen delay (up to 24 h), an SMS is sent automatically to a loved one. The alert can be turned off per medication.</li>
 <li>History of recent doses</li>
 </ul>
 <p>No account, no internet access, no ads. Data stays on the phone.</p>

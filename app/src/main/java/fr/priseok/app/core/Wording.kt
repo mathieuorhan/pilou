@@ -1,6 +1,7 @@
 package fr.priseok.app.core
 
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -23,8 +24,10 @@ object Wording {
     fun time(t: ZonedDateTime, locale: Locale, is24h: Boolean) = time(t.hour, t.minute, locale, is24h)
 
     /** "lundi 3 novembre" / "Monday, November 3". */
-    fun date(t: ZonedDateTime, locale: Locale): String =
-        DateTimeFormatter.ofPattern(if (isFrench(locale)) "EEEE d MMMM" else "EEEE, MMMM d", locale).format(t)
+    fun date(t: ZonedDateTime, locale: Locale): String = date(t.toLocalDate(), locale)
+
+    fun date(d: LocalDate, locale: Locale): String =
+        DateTimeFormatter.ofPattern(if (isFrench(locale)) "EEEE d MMMM" else "EEEE, MMMM d", locale).format(d)
 
     /** 0 = today, 1 = tomorrow, ... */
     fun daysBetween(now: ZonedDateTime, t: ZonedDateTime): Long =
@@ -33,14 +36,31 @@ object Wording {
     fun dayName(isoDay: Int, locale: Locale): String =
         DayOfWeek.of(isoDay).getDisplayName(TextStyle.FULL, locale)
 
+    /** "Mon" / "lun". */
+    fun dayShort(isoDay: Int, locale: Locale): String =
+        DayOfWeek.of(isoDay).getDisplayName(TextStyle.SHORT, locale).trimEnd('.')
+
     fun dayLetter(isoDay: Int, locale: Locale): String =
         DayOfWeek.of(isoDay).getDisplayName(TextStyle.NARROW, locale).uppercase(locale)
 
+    /** How far back the history pills reach, which decides how they are labelled. */
+    enum class Scale { DAYS, WEEKS, MONTHS }
+
+    /** Days within a week read as weekdays; a few weeks as dates; longer as months. */
+    fun scale(first: LocalDate, last: LocalDate): Scale {
+        val span = java.time.temporal.ChronoUnit.DAYS.between(first, last)
+        return when {
+            span < 7 -> Scale.DAYS
+            span <= 62 -> Scale.WEEKS
+            else -> Scale.MONTHS
+        }
+    }
+
     /** Short label under a history pill. */
-    fun historyLabel(f: Frequency, t: ZonedDateTime, locale: Locale): String = when (f) {
-        Frequency.DAILY -> t.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')
-        Frequency.WEEKLY -> if (isFrench(locale)) "${t.dayOfMonth}/${t.monthValue}" else "${t.monthValue}/${t.dayOfMonth}"
-        Frequency.MONTHLY -> t.month.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')
+    fun historyLabel(scale: Scale, d: LocalDate, locale: Locale): String = when (scale) {
+        Scale.DAYS -> d.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')
+        Scale.WEEKS -> if (isFrench(locale)) "${d.dayOfMonth}/${d.monthValue}" else "${d.monthValue}/${d.dayOfMonth}"
+        Scale.MONTHS -> d.month.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')
     }
 
     /** Keeps a leading + and the digits. Null if it cannot be a phone number. */

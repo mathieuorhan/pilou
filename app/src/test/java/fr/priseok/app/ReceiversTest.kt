@@ -7,6 +7,8 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.telephony.SmsManager
 import androidx.test.core.app.ApplicationProvider
+import fr.priseok.app.core.Med
+import fr.priseok.app.core.Schedule
 import fr.priseok.app.core.Settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -32,8 +34,10 @@ class ReceiversTest {
         store.prefs.edit().clear().commit()
         // Active from now: the schedule's own past doses are ignored, so rescheduling never sends
         // a late SMS for them, whatever the time of day the tests run at.
-        store.saveSettings(Settings(hour = 9, delayMinutes = 120, contactName = "Camille", phone = "+33639980000",
-            activeSince = System.currentTimeMillis()))
+        store.saveSettings(Settings(
+            listOf(Med(id = 1L, name = "Kardegic", activeSince = System.currentTimeMillis())),
+            delayMinutes = 120, contactName = "Camille", phone = "+33639980000",
+        ))
     }
 
     private fun fire(action: String, cycle: Long) =
@@ -66,7 +70,7 @@ class ReceiversTest {
         val cycle = System.currentTimeMillis()
         fire(Alarms.ACTION_REMIND, cycle)
         val nm = app.getSystemService(NotificationManager::class.java)
-        val n = shadowOf(nm).getNotification(Notifier.ID_REMINDER)
+        val n = shadowOf(nm).getNotification(Notifier.reminderId(cycle))
         assertNotNull(n)
         assertEquals("Did you take your medication?", shadowOf(n).contentTitle)
         assertEquals("Yes, I took it", n.actions.single().title)
@@ -75,11 +79,22 @@ class ReceiversTest {
         assertTrue(!channel.shouldVibrate())
     }
 
+    @Test fun reminderNamesTheMedicationsOfTheDose() {
+        store.saveSettings(store.settings().let { st ->
+            st.copy(meds = st.meds.map { it.copy(activeSince = 0L) } + Med(id = 2L, name = "Levothyrox", activeSince = 0L))
+        })
+        val today = java.time.ZonedDateTime.now()
+        val dose = Schedule.dosesOn(store.settings(), today.toLocalDate(), today.zone).single()
+        fire(Alarms.ACTION_REMIND, dose.cycle)
+        val n = shadowOf(app.getSystemService(NotificationManager::class.java)).getNotification(Notifier.reminderId(dose.cycle))
+        assertEquals("Kardegic, Levothyrox", shadowOf(n).contentText)
+    }
+
     @Test fun reminderIsSkippedIfAlreadyTakenEarly() {
         val cycle = System.currentTimeMillis()
         store.markTaken(cycle, cycle - hour)
         fire(Alarms.ACTION_REMIND, cycle)
-        assertNull(shadowOf(app.getSystemService(NotificationManager::class.java)).getNotification(Notifier.ID_REMINDER))
+        assertNull(shadowOf(app.getSystemService(NotificationManager::class.java)).getNotification(Notifier.reminderId(cycle)))
     }
 
     @Test fun rebootSetsTheNextReminder() {

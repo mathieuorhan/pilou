@@ -4,9 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import fr.priseok.app.core.Entry
 import fr.priseok.app.core.Frequency
+import fr.priseok.app.core.Med
 import fr.priseok.app.core.Settings
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
 
 /** Settings and dose history, kept in SharedPreferences. Small data, so no database. */
 class Store(context: Context) {
@@ -14,30 +16,38 @@ class Store(context: Context) {
         context.applicationContext.getSharedPreferences("priseok", Context.MODE_PRIVATE)
 
     fun settings(): Settings = Settings(
-        hour = prefs.getInt("hour", 9),
-        minute = prefs.getInt("minute", 0),
-        frequency = runCatching { Frequency.valueOf(prefs.getString("frequency", null)!!) }
-            .getOrDefault(Frequency.DAILY),
-        dayOfWeek = prefs.getInt("dayOfWeek", 1),
-        dayOfMonth = prefs.getInt("dayOfMonth", 1),
+        meds = prefs.getString("meds", null)?.let { Codec.meds(it) } ?: migratedMed(),
         delayMinutes = prefs.getInt("delayMinutes", 120),
         contactName = prefs.getString("contactName", "") ?: "",
         phone = prefs.getString("phone", "") ?: "",
-        activeSince = prefs.getLong("activeSince", 0L),
     )
+
+    /** Version 1 had a single reminder, stored as separate keys: it becomes one unnamed medication. */
+    private fun migratedMed(): List<Med> {
+        val since = prefs.getLong("activeSince", 0L)
+        if (since <= 0L) return emptyList()
+        val freq = runCatching { Frequency.valueOf(prefs.getString("frequency", null)!!) }.getOrDefault(Frequency.DAILY)
+        return listOf(
+            Med(
+                id = 1L,
+                times = listOf(prefs.getInt("hour", 9) * 60 + prefs.getInt("minute", 0)),
+                frequency = freq,
+                daysOfWeek = setOf(prefs.getInt("dayOfWeek", 1)),
+                dayOfMonth = prefs.getInt("dayOfMonth", 1),
+                activeSince = since,
+            )
+        )
+    }
 
     fun saveSettings(s: Settings) {
         prefs.edit()
-            .putInt("hour", s.hour)
-            .putInt("minute", s.minute)
-            .putString("frequency", s.frequency.name)
-            .putInt("dayOfWeek", s.dayOfWeek)
-            .putInt("dayOfMonth", s.dayOfMonth)
+            .putString("meds", Codec.meds(s.meds))
             .putInt("delayMinutes", s.delayMinutes)
             .putString("contactName", s.contactName)
             .putString("phone", s.phone)
-            .putLong("activeSince", s.activeSince)
-            .apply()
+            .remove("hour").remove("minute").remove("frequency")
+            .remove("dayOfWeek").remove("dayOfMonth").remove("activeSince")
+            .commit()
     }
 
     fun history(): Map<Long, Entry> {
@@ -76,5 +86,45 @@ class Store(context: Context) {
 
     fun markTaken(cycle: Long, at: Long) = update(cycle) { if (it.takenAt == null) it.copy(takenAt = at) else it }
 
-    companion object { private const val KEEP = 120 }
+    // Several doses a day: keep about four months of them.
+    companion object { private const val KEEP = 500 }
+}
+
+/** The medication list as JSON, for storage and for keeping a settings draft across rotations. */
+object Codec {
+    fun meds(list: List<Med>): String = JSONArray().apply {
+        list.forEach { m ->
+            put(JSONObject().apply {
+                put("id", m.id)
+                put("n", m.name)
+                put("t", JSONArray(m.times))
+                put("f", m.frequency.name)
+                put("w", JSONArray(m.daysOfWeek.sorted()))
+                put("d", m.dayOfMonth)
+                put("a", m.alert)
+                m.endDate?.let { put("e", it.toEpochDay()) }
+                put("s", m.activeSince)
+            })
+        }
+    }.toString()
+
+    fun meds(raw: String): List<Med> = runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            val t = o.getJSONArray("t")
+            val w = o.getJSONArray("w")
+            Med(
+                id = o.getLong("id"),
+                name = o.optString("n", ""),
+                times = (0 until t.length()).map { t.getInt(it) }.ifEmpty { listOf(9 * 60) },
+                frequency = runCatching { Frequency.valueOf(o.getString("f")) }.getOrDefault(Frequency.DAILY),
+                daysOfWeek = (0 until w.length()).map { w.getInt(it) }.toSet().ifEmpty { setOf(1) },
+                dayOfMonth = o.optInt("d", 1),
+                alert = o.optBoolean("a", true),
+                endDate = if (o.has("e")) LocalDate.ofEpochDay(o.getLong("e")) else null,
+                activeSince = o.optLong("s", 0L),
+            )
+        }
+    }.getOrDefault(emptyList())
 }

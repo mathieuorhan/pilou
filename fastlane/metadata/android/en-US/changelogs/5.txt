@@ -1,0 +1,1 @@
+Several medications, each with its own times, days, end date and alert. Doses at the same time are confirmed together.

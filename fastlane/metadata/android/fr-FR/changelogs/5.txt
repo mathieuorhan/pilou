@@ -1,0 +1,1 @@
+Plusieurs médicaments, chacun avec ses heures, ses jours, sa date de fin et son alerte. Les prises à la même heure se valident ensemble.

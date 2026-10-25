@@ -10,12 +10,17 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import fr.priseok.app.core.Schedule
+import java.time.ZoneId
 
 object Notifier {
     private const val CH_REMINDER = "rappel"
     private const val CH_INFO = "info"
+    /** Notification id of the test reminder. Real reminders get one id per dose (see [reminderId]). */
     const val ID_REMINDER = 10
     private const val ID_INFO = 11
+
+    fun reminderId(cycle: Long): Int = if (cycle < 0) ID_REMINDER else Alarms.confirmCode(cycle)
 
     fun ensureChannels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -44,16 +49,26 @@ object Notifier {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** The reminder. [late] = the SMS already went out, but the dose can still be confirmed. */
+    /**
+     * The reminder for one dose, listing its medications by name.
+     * [late] = the text already went out, but the dose can still be confirmed.
+     */
     fun showReminder(ctx: Context, cycle: Long, late: Boolean = false) {
         if (!allowed(ctx)) return
         ensureChannels(ctx)
-        val confirm = Alarms.intent(ctx, Alarms.ACTION_CONFIRM, cycle, Alarms.RC_CONFIRM)
+        val names = if (cycle < 0) "" else Store(ctx).settings().let { s ->
+            Schedule.doseAt(s, cycle, ZoneId.systemDefault())?.meds.orEmpty()
+                .map { it.name.trim() }.filter { it.isNotEmpty() }.joinToString(", ")
+        }
+        val hint = ctx.getString(if (late) R.string.notif_text_late else R.string.notif_text)
+        val text = if (names.isEmpty()) hint else "$names\n$hint"
+        val confirm = Alarms.intent(ctx, Alarms.ACTION_CONFIRM, cycle, Alarms.confirmCode(cycle))
         val n = NotificationCompat.Builder(ctx, CH_REMINDER)
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(0xFFFF8EA1.toInt())
             .setContentTitle(ctx.getString(R.string.notif_question))
-            .setContentText(ctx.getString(if (late) R.string.notif_text_late else R.string.notif_text))
+            .setContentText(names.ifEmpty { hint })
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openApp(ctx))
             .addAction(R.drawable.ic_check, ctx.getString(R.string.confirm_button), confirm)
             .setSilent(true)
@@ -61,11 +76,11 @@ object Notifier {
             .setAutoCancel(false)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
-        ctx.getSystemService(NotificationManager::class.java).notify(ID_REMINDER, n)
+        ctx.getSystemService(NotificationManager::class.java).notify(reminderId(cycle), n)
     }
 
-    fun cancelReminder(ctx: Context) =
-        ctx.getSystemService(NotificationManager::class.java).cancel(ID_REMINDER)
+    fun cancelReminder(ctx: Context, cycle: Long) =
+        ctx.getSystemService(NotificationManager::class.java).cancel(reminderId(cycle))
 
     fun info(ctx: Context, title: Int, text: String) {
         if (!allowed(ctx)) return

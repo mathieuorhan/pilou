@@ -35,6 +35,23 @@
     <string name="when_today">aujourd\'hui à %1$s</string>
     <string name="when_tomorrow">demain à %1$s</string>
     <string name="when_date">%1$s à %2$s</string>
+    <string name="none_left">Aucune prise prévue pour l\'instant.</string>
+    <string name="due_hint_quiet">Pas d\'alerte pour celle-ci : touche quand c\'est fait.</string>
+    <string name="med_default">Médicament</string>
+    <plurals name="med_count">
+        <item quantity="one">%d médicament</item>
+        <item quantity="many">%d médicaments</item>
+        <item quantity="other">%d médicaments</item>
+    </plurals>
+    <string name="list_and">%1$s et %2$s</string>
+    <string name="freq_days">Chaque %1$s à %2$s</string>
+    <string name="until_date">Jusqu\'au %1$s</string>
+    <string name="today_title">Aujourd\'hui</string>
+    <string name="row_taken_at">Pris à %1$s</string>
+    <string name="row_sms">SMS envoyé</string>
+    <string name="row_upcoming">À venir</string>
+    <string name="row_confirm">Pris</string>
+    <string name="row_confirm_cd">Valider la prise de %1$s</string>
 
     <!-- Mascotte, pour les lecteurs d'écran -->
     <string name="mascot_waiting">Pilou attend. Touche-le pour valider la prise.</string>
@@ -44,11 +61,34 @@
 
     <!-- Réglages -->
     <string name="welcome_title">Bienvenue !</string>
-    <string name="welcome_text">Moi, c\'est Pilou. Trois réglages et c\'est parti. Je te poserai la question à l\'heure choisie, sans bruit.</string>
+    <string name="welcome_text">Moi, c\'est Pilou. Dis-moi ce que tu prends et qui prévenir, et c\'est parti. Je te poserai la question aux bonnes heures, sans bruit.</string>
+    <string name="section_meds">Quoi prendre ?</string>
+    <string name="add_med">Ajouter un médicament</string>
+    <string name="med_no_alert">Sans alerte</string>
+    <string name="med_edit_cd">Modifier %1$s</string>
+    <string name="delay_line">Sans validation dans les %1$s, un SMS part.</string>
+    <string name="delay_less">Plus court</string>
+    <string name="delay_more">Plus long</string>
+    <string name="delay_only_alert">Seulement pour les médicaments avec l\'alerte.</string>
+    <string name="med_new">Nouveau médicament</string>
+    <string name="med_title">Médicament</string>
+    <string name="med_name">Nom et dose (facultatif)</string>
+    <string name="med_name_example">Kardegic 75 mg</string>
+    <string name="section_times">À quelle heure ?</string>
+    <string name="add_time">Ajouter une heure</string>
+    <string name="remove_time_cd">Retirer %1$s</string>
+    <string name="section_days">Quels jours ?</string>
+    <string name="some_days">Certains jours</string>
+    <string name="section_until">Jusqu\'à quand ?</string>
+    <string name="no_end">Sans fin</string>
+    <string name="until_toggle">Jusqu\'à une date</string>
+    <string name="last_day">Dernier jour : %1$s</string>
+    <string name="alert_switch">Prévenir mon contact en cas d\'oubli</string>
+    <string name="done">Valider</string>
+    <string name="remove_med">Supprimer ce médicament</string>
     <string name="section_when">Quand ?</string>
     <string name="time_cd">Heure du rappel : %1$s. Toucher pour changer.</string>
     <string name="every_day">Chaque jour</string>
-    <string name="every_week">Chaque semaine</string>
     <string name="every_month">Chaque mois</string>
     <string name="monthly_on">Le</string>
     <string name="monthly_of_month">du mois</string>
@@ -56,10 +96,6 @@
     <string name="next_day">Jour suivant</string>
     <string name="monthly_short_hint">Les mois plus courts, ce sera le dernier jour.</string>
     <string name="section_forget">Si j\'oublie ?</string>
-    <string name="alert_cd">Heure de l\'alerte : %1$s. Toucher pour changer.</string>
-    <string name="alert_explain">Sans validation à cette heure-là, un SMS part.</string>
-    <string name="alert_gap">Soit %1$s après le rappel.</string>
-    <string name="alert_gap_next_day">Soit le lendemain, %1$s après le rappel.</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d</string>

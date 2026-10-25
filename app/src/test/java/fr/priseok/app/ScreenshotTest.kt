@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import fr.priseok.app.core.Entry
-import fr.priseok.app.core.Frequency
+import fr.priseok.app.core.Med
 import fr.priseok.app.core.Home
 import fr.priseok.app.core.Settings
 import fr.priseok.app.ui.HomeScreen
@@ -23,6 +23,7 @@ import fr.priseok.app.ui.PermissionsCard
 import fr.priseok.app.ui.PriseTheme
 import fr.priseok.app.ui.SettingsScreen
 import fr.priseok.app.ui.historyItems
+import fr.priseok.app.ui.todayItems
 import fr.priseok.app.ui.rememberTexts
 import org.junit.Rule
 import org.junit.Test
@@ -54,8 +55,19 @@ class ScreenshotTest(private val lang: String) {
     private val zone = ZoneId.of("Europe/Paris")
     private fun at(d: Int, h: Int, m: Int = 0) = ZonedDateTime.of(LocalDateTime.of(2026, 10, d, h, m), zone)
     private fun ms(z: ZonedDateTime) = z.toInstant().toEpochMilli()
-    private val s = Settings(hour = 9, delayMinutes = 120, contactName = "Camille", phone = "0639980000",
-        activeSince = ms(at(1, 0)))
+    private val s = Settings(listOf(Med(id = 1L, activeSince = ms(at(1, 0)))), delayMinutes = 120,
+        contactName = "Camille", phone = "0639980000")
+
+    // Several medications: two in the morning, an antibiotic three times a day for a week, vitamin D without alert.
+    private val many = Settings(
+        listOf(
+            Med(1L, "Kardegic 75 mg", listOf(8 * 60), activeSince = ms(at(1, 0))),
+            Med(2L, "Levothyrox 50 µg", listOf(8 * 60), activeSince = ms(at(1, 0))),
+            Med(3L, "Amoxicilline 1 g", listOf(8 * 60, 12 * 60 + 30, 20 * 60), endDate = java.time.LocalDate.of(2026, 10, 28), activeSince = ms(at(22, 0))),
+            Med(4L, "Vitamine D", listOf(20 * 60), alert = false, activeSince = ms(at(1, 0))),
+        ),
+        delayMinutes = 120, contactName = "Camille", phone = "0639980000",
+    )
 
     // a realistic week: one forgotten dose on Wednesday
     private val week: Map<Long, Entry> = (18..24).associate { d ->
@@ -66,20 +78,25 @@ class ScreenshotTest(private val lang: String) {
     private fun setLang(dark: Boolean = false) =
         RuntimeEnvironment.setQualifiers("+$lang" + if (dark) "-night" else "")
 
-    private fun home(name: String, now: ZonedDateTime, history: Map<Long, Entry>, celebrate: Int = 0, perms: Boolean = false, dark: Boolean = false) {
+    private fun home(
+        name: String, now: ZonedDateTime, history: Map<Long, Entry>, celebrate: Int = 0, perms: Boolean = false,
+        dark: Boolean = false, settings: Settings = s,
+    ) {
         rule.mainClock.autoAdvance = false
         setLang(dark)
         rule.setContent {
             Frame {
                 val tx = rememberTexts()
-                val h = Home.state(s, history, now)
+                val h = Home.state(settings, history, now)
+                val (scale, past) = historyItems(settings, history, now, tx.locale)
                 HomeScreen(
                     phase = h.phase,
-                    text = tx.home(h, s, now),
+                    text = tx.home(h, settings, now),
                     confirmCycle = h.confirmCycle,
-                    frequencyText = tx.frequency(s),
-                    historyTitle = tx.historyTitle(s.frequency),
-                    history = historyItems(s, history, now, tx.locale),
+                    header = tx.header(settings),
+                    today = todayItems(settings, history, now, h.confirmCycle, tx),
+                    historyTitle = tx.historyTitle(scale),
+                    history = past,
                     celebrate = celebrate,
                     permissions = { if (perms) PermissionsCard(0) {} },
                     onConfirm = {}, onSettings = {},
@@ -116,11 +133,14 @@ class ScreenshotTest(private val lang: String) {
 
     @Test fun home5DarkDue() = home("5_dark_due", at(25, 9, 20), week, dark = true)
 
-    private fun settings(name: String, initial: Settings, firstRun: Boolean) {
+    private fun settings(name: String, initial: Settings, firstRun: Boolean, openMed: Long? = null) {
         setLang()
         rule.setContent {
             Frame {
-                SettingsScreen(initial, firstRun, onSave = {}, onBack = if (firstRun) null else ({}), onTestReminder = {}, onTestSms = {})
+                SettingsScreen(
+                    initial, firstRun, onSave = {}, onBack = if (firstRun) null else ({}), onTestReminder = {}, onTestSms = {},
+                    today = java.time.LocalDate.of(2026, 10, 25), openMed = openMed,
+                )
             }
         }
         rule.onRoot().captureRoboImage("build/screenshots/$lang/$name.png")
@@ -128,10 +148,17 @@ class ScreenshotTest(private val lang: String) {
 
     @Test fun settings1FirstRun() = settings("6_welcome", Settings(), firstRun = true)
 
-    @Test fun settings2Weekly() = settings(
-        "7_settings_weekly",
-        s.copy(frequency = Frequency.WEEKLY, dayOfWeek = 3, hour = 20, minute = 30, delayMinutes = 210), firstRun = false,
-    )
+    @Test fun settings2List() = settings("7_settings", many, firstRun = false)
+
+    @Test fun settings3Editor() = settings("9_medication", many, firstRun = false, openMed = 3L)
+
+    /** Sunday noon with four medications: the morning dose taken, the antibiotic's noon dose due. */
+    @Test fun home6Today() {
+        val morning = ms(at(25, 8))
+        val days = (22..24).flatMap { d -> listOf(8, 20).map { h -> ms(at(d, h)) } } + (22..24).map { d -> ms(at(d, 12, 30)) }
+        val past = days.associateWith { c -> Entry(c, takenAt = c + 300_000) }
+        home("8_today", at(25, 12, 40), past + (morning to Entry(morning, takenAt = ms(at(25, 8, 6)))), settings = many)
+    }
 
     /** Pilou alone, celebrating, on a transparent background: the README picture. */
     @Test fun mascot() {

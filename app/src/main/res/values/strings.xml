@@ -37,6 +37,22 @@
     <string name="when_today">today at %1$s</string>
     <string name="when_tomorrow">tomorrow at %1$s</string>
     <string name="when_date">%1$s at %2$s</string>
+    <string name="none_left">No dose planned for now.</string>
+    <string name="due_hint_quiet">No alert for this one: tap when it\'s done.</string>
+    <string name="med_default">Medication</string>
+    <plurals name="med_count">
+        <item quantity="one">%d medication</item>
+        <item quantity="other">%d medications</item>
+    </plurals>
+    <string name="list_and">%1$s and %2$s</string>
+    <string name="freq_days">Every %1$s at %2$s</string>
+    <string name="until_date">Until %1$s</string>
+    <string name="today_title">Today</string>
+    <string name="row_taken_at">Taken at %1$s</string>
+    <string name="row_sms">Text sent</string>
+    <string name="row_upcoming">Coming up</string>
+    <string name="row_confirm">Taken</string>
+    <string name="row_confirm_cd">Confirm the %1$s dose</string>
 
     <!-- Mascot, for screen readers -->
     <string name="mascot_waiting">Pilou is waiting. Tap it to confirm the dose.</string>
@@ -46,11 +62,34 @@
 
     <!-- Settings -->
     <string name="welcome_title">Welcome!</string>
-    <string name="welcome_text">I\'m Pilou. Three settings and you\'re set. I\'ll ask at the chosen time, without a sound.</string>
+    <string name="welcome_text">I\'m Pilou. Add what you take and who to tell, and you\'re set. I\'ll ask at the right times, without a sound.</string>
+    <string name="section_meds">What to take?</string>
+    <string name="add_med">Add a medication</string>
+    <string name="med_no_alert">No alert</string>
+    <string name="med_edit_cd">Edit %1$s</string>
+    <string name="delay_line">If a dose isn\'t confirmed within %1$s, a text goes out.</string>
+    <string name="delay_less">Shorter</string>
+    <string name="delay_more">Longer</string>
+    <string name="delay_only_alert">Only for medications with the alert on.</string>
+    <string name="med_new">New medication</string>
+    <string name="med_title">Medication</string>
+    <string name="med_name">Name and dose (optional)</string>
+    <string name="med_name_example">Kardegic 75 mg</string>
+    <string name="section_times">At what time?</string>
+    <string name="add_time">Add a time</string>
+    <string name="remove_time_cd">Remove %1$s</string>
+    <string name="section_days">Which days?</string>
+    <string name="some_days">Some days</string>
+    <string name="section_until">Until when?</string>
+    <string name="no_end">No end</string>
+    <string name="until_toggle">Until a date</string>
+    <string name="last_day">Last day: %1$s</string>
+    <string name="alert_switch">Text my contact if it\'s missed</string>
+    <string name="done">Done</string>
+    <string name="remove_med">Remove this medication</string>
     <string name="section_when">When?</string>
     <string name="time_cd">Reminder time: %1$s. Tap to change.</string>
     <string name="every_day">Every day</string>
-    <string name="every_week">Every week</string>
     <string name="every_month">Every month</string>
     <string name="monthly_on">On day</string>
     <string name="monthly_of_month">of the month</string>
@@ -58,10 +97,6 @@
     <string name="next_day">Next day</string>
     <string name="monthly_short_hint">In shorter months, the last day is used.</string>
     <string name="section_forget">If I forget?</string>
-    <string name="alert_cd">Alert time: %1$s. Tap to change.</string>
-    <string name="alert_explain">If not confirmed by then, a text goes out.</string>
-    <string name="alert_gap">That\'s %1$s after the reminder.</string>
-    <string name="alert_gap_next_day">That\'s the next day, %1$s after the reminder.</string>
     <string name="delay_min">%1$d min</string>
     <string name="delay_h">%1$d h</string>
     <string name="delay_hm">%1$d h %2$02d min</string>
