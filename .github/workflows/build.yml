@@ -1,0 +1,133 @@
+name: build
+
+# Pull requests: tests + unsigned release build.
+# Push to main: tests + signed release build. When versionName in app/build.gradle.kts
+# has no release yet, the signed APK is published as release "v<versionName>"
+# (Obtainium picks it up; F-Droid builds from the same tag).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      # Third-party actions are pinned to a commit so a moved tag cannot change what runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the Gradle wrapper is the official one
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # The runner image ships the Android SDK (ANDROID_HOME).
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Unit tests and screenshots
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Upload test reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests
+          path: |
+            app/build/reports/tests/
+            app/build/screenshots/
+          if-no-files-found: ignore
+
+      # Secrets are never available to pull requests from forks, so this only runs on main.
+      - name: Restore signing key
+        id: key
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::warning::Secret KEYSTORE_B64 is missing: the APK will be unsigned and not released."
+            exit 0
+          fi
+          umask 077
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Release build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Remove signing key
+        if: always() && steps.key.outputs.signed == 'true'
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Decide whether to release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ steps.key.outputs.signed }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          V=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          TAG="v$V"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/out"
+          if [ "$SIGNED" = "true" ]; then
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/PriseOK-$V.apk"
+          else
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/out/PriseOK-$V-unsigned.apk"
+          fi
+          if [ "$EVENT" = "pull_request" ] || [ "$SIGNED" != "true" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists: build only"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk
+          path: ${{ runner.temp }}/out/*.apk
+
+  release:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: apk
+          path: out
+
+      - name: Publish release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: out/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
