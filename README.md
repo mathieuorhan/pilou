@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/pilou.png" width="300" alt="Pilou, the PriseOK capsule"></p>
+<p align="center"><img src="docs/pilou.png" width="300" alt="Pilou"></p>
 
-# PriseOK
+# Pilou
 
 A silent medication reminder for Android, in English and French. At the chosen time,
 a notification asks whether the medication was taken. If nobody confirms in time,

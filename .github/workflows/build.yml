@@ -90,9 +90,9 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           mkdir -p "$RUNNER_TEMP/out"
           if [ "$SIGNED" = "true" ]; then
-            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/PriseOK-$V.apk"
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/Pilou-$V.apk"
           else
-            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/out/PriseOK-$V-unsigned.apk"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/out/Pilou-$V-unsigned.apk"
           fi
           if [ "$EVENT" = "pull_request" ] || [ "$SIGNED" != "true" ]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"

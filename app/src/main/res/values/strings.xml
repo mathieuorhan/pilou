@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">PriseOK</string>
+    <string name="app_name" translatable="false">Pilou</string>
 
     <!-- Home -->
     <string name="settings">Settings</string>
@@ -46,7 +46,7 @@
 
     <!-- Settings -->
     <string name="welcome_title">Welcome!</string>
-    <string name="welcome_text">Three settings and you\'re set. I\'ll ask at the chosen time, without a sound.</string>
+    <string name="welcome_text">I\'m Pilou. Three settings and you\'re set. I\'ll ask at the chosen time, without a sound.</string>
     <string name="section_when">When?</string>
     <string name="time_cd">Reminder time: %1$s. Tap to change.</string>
     <string name="every_day">Every day</string>
@@ -70,8 +70,8 @@
     <string name="phone_error_test">Add a valid number to test.</string>
     <string name="start">Let\'s go</string>
     <string name="save">Save</string>
-    <string name="test_reminder">Test the reminder</string>
-    <string name="test_sms">Test the text</string>
+    <string name="test_reminder">Test reminder</string>
+    <string name="test_sms">Test text</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="toast_test_sms">Test text sent to %1$s</string>
@@ -103,10 +103,10 @@
 
     <!-- Text messages (sent to the contact, so keep them under 70 characters) -->
     <string name="sms_alert">Warning! Your contact hasn\'t taken their medication.</string>
-    <string name="sms_test">PriseOK test: if you get this, alerts work.</string>
+    <string name="sms_test">Pilou test: if you get this, alerts work.</string>
     <string name="sms_not_sent">Text not sent</string>
     <string name="sms_no_number">No contact number is saved.</string>
-    <string name="sms_no_permission">PriseOK isn\'t allowed to send texts. Open the app to allow it.</string>
+    <string name="sms_no_permission">Pilou isn\'t allowed to send texts. Open the app to allow it.</string>
     <string name="sms_refused">The phone refused to send it (%1$s).</string>
     <string name="sms_test_sent_title">Test text sent</string>
     <string name="sms_test_sent_text">Check that it reached your contact.</string>

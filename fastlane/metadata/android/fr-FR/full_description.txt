@@ -1,4 +1,4 @@
-<p>PriseOK pose une seule question, à l'heure choisie : « As-tu pris ton médicament ? »</p>
+<p>Pilou pose une seule question, à l'heure choisie : « As-tu pris ton médicament ? »</p>
 <ul>
 <li>Rappel chaque jour, chaque semaine ou chaque mois, à l'heure choisie</li>
 <li>Notification silencieuse, sans son ni vibration</li>

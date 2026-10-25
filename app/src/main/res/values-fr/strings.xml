@@ -44,7 +44,7 @@
 
     <!-- Réglages -->
     <string name="welcome_title">Bienvenue !</string>
-    <string name="welcome_text">Trois réglages et c\'est parti. Je te poserai la question à l\'heure choisie, sans bruit.</string>
+    <string name="welcome_text">Moi, c\'est Pilou. Trois réglages et c\'est parti. Je te poserai la question à l\'heure choisie, sans bruit.</string>
     <string name="section_when">Quand ?</string>
     <string name="time_cd">Heure du rappel : %1$s. Toucher pour changer.</string>
     <string name="every_day">Chaque jour</string>
@@ -102,10 +102,10 @@
 
     <!-- SMS (envoyés au contact : moins de 70 caractères) -->
     <string name="sms_alert">Attention ! Ton contact n\'a pas pris son médicament.</string>
-    <string name="sms_test">Test PriseOK : si tu reçois ce message, les alertes fonctionnent.</string>
+    <string name="sms_test">Test Pilou : si tu reçois ce message, les alertes fonctionnent.</string>
     <string name="sms_not_sent">SMS non envoyé</string>
     <string name="sms_no_number">Aucun numéro de contact n\'est enregistré.</string>
-    <string name="sms_no_permission">PriseOK n\'a pas l\'autorisation d\'envoyer des SMS. Ouvre l\'app pour l\'accorder.</string>
+    <string name="sms_no_permission">Pilou n\'a pas l\'autorisation d\'envoyer des SMS. Ouvre l\'app pour l\'accorder.</string>
     <string name="sms_refused">Le téléphone a refusé l\'envoi (%1$s).</string>
     <string name="sms_test_sent_title">SMS de test envoyé</string>
     <string name="sms_test_sent_text">Vérifie qu\'il est bien arrivé chez ton contact.</string>

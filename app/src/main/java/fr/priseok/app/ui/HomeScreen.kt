@@ -77,7 +77,7 @@ fun HomeScreen(
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("PriseOK", style = MaterialTheme.typography.titleLarge, color = p.pine)
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = p.pine)
                 Text(frequencyText, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
             }
             IconButton(onClick = onSettings) {
