@@ -4,7 +4,7 @@ name: build
 # Push to main: tests + signed builds, then
 # - stable: when versionName in app/build.gradle.kts has no release yet, the release APK
 #   is published as release "v<versionName>" (Obtainium picks it up; F-Droid builds from the same tag).
-# - beta: every push replaces the "beta" pre-release with the beta APK of this commit
+# - beta: every push publishes the beta APK of this commit as pre-release "beta-<run number>"
 #   (package fr.priseok.app.beta, installs next to the stable app).
 on:
   push:
@@ -161,15 +161,19 @@ jobs:
           name: apk-beta
           path: out
 
-      # One rolling pre-release: deleted and recreated on each push, so its date and tag
-      # always point at the latest main. Its title starts with "Beta" for Obtainium's filter.
+      # One pre-release per push, tagged beta-<run number>: published releases are immutable on this
+      # repository, so a tag can never be reused. Only the three most recent betas are kept.
+      # Titles start with "Beta" for Obtainium's filter.
       - name: Publish beta
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete beta -R "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
           APK=$(ls out/*.apk)
           V=$(basename "$APK" .apk); V=${V#Pilou-}
-          gh release create beta "$APK" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
-            --title "Beta $V" \
+          gh release create "beta-$GITHUB_RUN_NUMBER" "$APK" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false --title "Beta $V" \
             --notes "Latest main (${GITHUB_SHA::7}). Installs as a separate app, Pilou β, next to the stable one. May be broken."
+          gh release list -R "$GITHUB_REPOSITORY" --limit 100 --json tagName,isPrerelease \
+            -q '.[] | select(.isPrerelease and (.tagName | startswith("beta-"))) | .tagName' \
+            | sort -t- -k2 -n -r | tail -n +4 \
+            | while read -r old; do gh release delete "$old" -R "$GITHUB_REPOSITORY" --yes || true; done

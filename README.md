@@ -22,7 +22,7 @@ or add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) to 
 
 ### Beta
 
-The [beta release](https://github.com/mathieuorhan/pilou/releases/tag/beta) is the latest
+The latest [release](https://github.com/mathieuorhan/pilou/releases) named "Beta" is the
 development version. It installs as a separate app, Pilou β, so the stable app stays as it is.
 It may be broken: don't rely on it for an actual medication.
 
