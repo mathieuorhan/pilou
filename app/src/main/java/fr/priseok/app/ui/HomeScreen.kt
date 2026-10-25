@@ -40,16 +40,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.priseok.app.R
 import fr.priseok.app.core.CycleStatus
-import fr.priseok.app.core.HomeState
 import fr.priseok.app.core.Phase
 import fr.priseok.app.core.Wording
+import androidx.compose.ui.res.stringResource
 import java.time.ZonedDateTime
 
 data class HistoryItem(val label: String, val status: CycleStatus, val time: ZonedDateTime)
 
 @Composable
 fun HomeScreen(
-    state: HomeState,
+    phase: Phase,
+    text: HomeText,
+    confirmCycle: Long?,
     frequencyText: String,
     historyTitle: String,
     history: List<HistoryItem>,
@@ -60,7 +62,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val p = LocalPalette.current
-    val mood = when (state.phase) {
+    val mood = when (phase) {
         Phase.NOTHING_DUE -> Mood.SLEEPY
         Phase.EARLY, Phase.DUE -> Mood.WAITING
         Phase.TAKEN -> Mood.HAPPY
@@ -79,7 +81,7 @@ fun HomeScreen(
                 Text(frequencyText, style = MaterialTheme.typography.bodyMedium, color = p.pineSoft)
             }
             IconButton(onClick = onSettings) {
-                Icon(painterResource(R.drawable.ic_settings), contentDescription = "Réglages", tint = p.pine)
+                Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings), tint = p.pine)
             }
         }
 
@@ -87,13 +89,13 @@ fun HomeScreen(
             mood = mood,
             celebrate = celebrate,
             modifier = Modifier.fillMaxWidth().height(250.dp),
-            onTap = state.confirmCycle?.let { c -> { onConfirm(c) } },
+            onTap = confirmCycle?.let { c -> { onConfirm(c) } },
         )
 
         AnimatedContent(
-            targetState = state,
+            targetState = text,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
-            contentKey = { it.phase },
+            contentKey = { phase },
             label = "status",
         ) { s ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -107,7 +109,7 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(24.dp))
-        val target = state.confirmCycle
+        val target = confirmCycle
         if (target != null) {
             Button(
                 onClick = { onConfirm(target) },
@@ -117,7 +119,7 @@ fun HomeScreen(
             ) {
                 Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Oui, j'ai pris", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.confirm_button), style = MaterialTheme.typography.labelLarge)
             }
         }
 
@@ -136,9 +138,9 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                LegendDot(p.leaf); Text(" pris", style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
+                LegendDot(p.leaf); Text(" " + stringResource(R.string.status_taken), style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
                 Spacer(Modifier.width(14.dp))
-                LegendDot(p.coral); Text(" oublié", style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
+                LegendDot(p.coral); Text(" " + stringResource(R.string.status_missed), style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
             }
         }
         Spacer(Modifier.height(32.dp))
@@ -148,12 +150,17 @@ fun HomeScreen(
 @Composable
 private fun HistoryPill(item: HistoryItem) {
     val p = LocalPalette.current
-    val what = when (item.status) {
-        CycleStatus.TAKEN -> "pris"; CycleStatus.MISSED -> "oublié"; CycleStatus.PENDING -> "en attente"
-    }
+    val what = stringResource(
+        when (item.status) {
+            CycleStatus.TAKEN -> R.string.status_taken
+            CycleStatus.MISSED -> R.string.status_missed
+            CycleStatus.PENDING -> R.string.status_pending
+        }
+    )
+    val desc = stringResource(R.string.history_item, item.label, what)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(34.dp).semantics { contentDescription = "${item.label} : $what" },
+        modifier = Modifier.width(34.dp).semantics { contentDescription = desc },
     ) {
         Canvas(Modifier.size(width = 16.dp, height = 34.dp)) {
             val r = CornerRadius(size.width / 2, size.width / 2)
@@ -184,11 +191,12 @@ fun historyItems(
     s: fr.priseok.app.core.Settings,
     history: Map<Long, fr.priseok.app.core.Entry>,
     now: ZonedDateTime,
+    locale: java.util.Locale,
 ): List<HistoryItem> =
     fr.priseok.app.core.Schedule.recent(s, now, 7).map { t ->
         val key = t.toInstant().toEpochMilli()
         HistoryItem(
-            Wording.historyLabel(s.frequency, t),
+            Wording.historyLabel(s.frequency, t, locale),
             fr.priseok.app.core.Schedule.status(s, key, history[key], now),
             t,
         )

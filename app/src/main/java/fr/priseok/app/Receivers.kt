@@ -39,16 +39,15 @@ class SmsResultReceiver : BroadcastReceiver() {
         if (test) {
             Notifier.info(
                 ctx,
-                if (ok) "SMS de test envoyé" else "Le SMS de test n'est pas parti",
-                if (ok) "Vérifie qu'il est bien arrivé chez ton contact."
-                else "Vérifie le réseau, le forfait et le numéro, puis réessaie.",
+                if (ok) R.string.sms_test_sent_title else R.string.sms_test_failed_title,
+                ctx.getString(if (ok) R.string.sms_test_sent_text else R.string.sms_test_failed_text),
             )
             return
         }
         val cycle = intent.getLongExtra(Alarms.EXTRA_CYCLE, 0L)
         if (!ok) {
             Store(ctx).update(cycle) { it.copy(smsFailed = true) }
-            Notifier.info(ctx, "L'alerte SMS n'est pas partie", "Vérifie le réseau et le forfait. Ton contact n'a pas reçu l'alerte.")
+            Notifier.info(ctx, R.string.sms_alert_failed_title, ctx.getString(R.string.sms_alert_failed_text))
         }
     }
 }

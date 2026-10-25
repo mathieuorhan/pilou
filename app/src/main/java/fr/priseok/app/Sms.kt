@@ -10,8 +10,6 @@ import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 
 object Sms {
-    const val ALERT_TEXT = "Attention ! Ton contact n'a pas pris son médicament."
-    const val TEST_TEXT = "Test PriseOK : si tu reçois ce message, les alertes fonctionnent."
     const val EXTRA_TEST = "test"
 
     fun canSend(ctx: Context) =
@@ -26,20 +24,20 @@ object Sms {
         val store = Store(ctx)
         val e = store.history()[cycle]
         if (e?.takenAt != null || e?.smsAt != null) return
-        val ok = send(ctx, store.settings().phone, ALERT_TEXT, cycle, test = false)
+        val ok = send(ctx, store.settings().phone, ctx.getString(R.string.sms_alert), cycle, test = false)
         store.update(cycle) { it.copy(smsAt = System.currentTimeMillis(), smsFailed = !ok) }
         if (ok) Notifier.showReminder(ctx, cycle, late = true)
     }
 
-    fun sendTest(ctx: Context, phone: String): Boolean = send(ctx, phone, TEST_TEXT, 0L, test = true)
+    fun sendTest(ctx: Context, phone: String): Boolean = send(ctx, phone, ctx.getString(R.string.sms_test), 0L, test = true)
 
     private fun send(ctx: Context, phone: String, text: String, cycle: Long, test: Boolean): Boolean {
         if (phone.isBlank()) {
-            Notifier.info(ctx, "SMS non envoyé", "Aucun numéro de contact n'est enregistré.")
+            Notifier.info(ctx, R.string.sms_not_sent, ctx.getString(R.string.sms_no_number))
             return false
         }
         if (!canSend(ctx)) {
-            Notifier.info(ctx, "SMS non envoyé", "PriseOK n'a pas l'autorisation d'envoyer des SMS. Ouvre l'app pour l'accorder.")
+            Notifier.info(ctx, R.string.sms_not_sent, ctx.getString(R.string.sms_no_permission))
             return false
         }
         return try {
@@ -59,7 +57,7 @@ object Sms {
             }
             true
         } catch (t: Throwable) {
-            Notifier.info(ctx, "SMS non envoyé", "Le téléphone a refusé l'envoi (${t.javaClass.simpleName}).")
+            Notifier.info(ctx, R.string.sms_not_sent, ctx.getString(R.string.sms_refused, t.javaClass.simpleName))
             false
         }
     }

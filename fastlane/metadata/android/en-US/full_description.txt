@@ -1,4 +1,4 @@
-<p>PriseOK asks one question at the time you choose: "Did you take your medication?" (the app is in French).</p>
+<p>PriseOK asks one question at the time you choose: "Did you take your medication?"</p>
 <ul>
 <li>Daily, weekly or monthly reminder at a set time</li>
 <li>Silent notification, no sound or vibration</li>

@@ -7,6 +7,7 @@ import org.junit.Test
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.Locale
 
 class ScheduleTest {
     private val paris = ZoneId.of("Europe/Paris")
@@ -142,49 +143,74 @@ class ScheduleTest {
 class HomeTest {
     private val paris = ZoneId.of("Europe/Paris")
     private fun at(d: Int, h: Int, mi: Int = 0) = ZonedDateTime.of(LocalDateTime.of(2026, 3, d, h, mi), paris)
+    private fun ms(z: ZonedDateTime) = z.toInstant().toEpochMilli()
     private val s = Settings(hour = 9, delayMinutes = 120, contactName = "Camille", phone = "0639980000",
-        activeSince = at(1, 0).toInstant().toEpochMilli())
+        activeSince = ms(at(1, 0)))
 
     @Test fun due() {
         val h = Home.state(s, emptyMap(), at(10, 9, 30))
         assertEquals(Phase.DUE, h.phase)
-        assertTrue(h.hint!!.contains("Camille reçoit un SMS à 11h00"))
+        assertEquals(at(10, 11), h.deadline)
+        assertEquals(ms(at(10, 9)), h.confirmCycle)
     }
 
     @Test fun missedAfterSms() {
-        val c = at(10, 9).toInstant().toEpochMilli()
-        val h = Home.state(s, mapOf(c to Entry(c, smsAt = at(10, 11).toInstant().toEpochMilli())), at(10, 12))
+        val c = ms(at(10, 9))
+        val h = Home.state(s, mapOf(c to Entry(c, smsAt = ms(at(10, 11)))), at(10, 12))
         assertEquals(Phase.MISSED, h.phase)
-        assertEquals("Camille a reçu l'alerte par SMS à 11h00.", h.line)
+        assertEquals(at(10, 11), h.smsAt)
         assertEquals(c, h.confirmCycle)
     }
 
     @Test fun takenShowsNextReminder() {
-        val c = at(10, 9).toInstant().toEpochMilli()
-        val h = Home.state(s, mapOf(c to Entry(c, takenAt = at(10, 9, 12).toInstant().toEpochMilli())), at(10, 10))
+        val c = ms(at(10, 9))
+        val h = Home.state(s, mapOf(c to Entry(c, takenAt = ms(at(10, 9, 12)))), at(10, 10))
         assertEquals(Phase.TAKEN, h.phase)
-        assertEquals("Pris à 9h12.", h.line)
-        assertEquals("Prochain rappel demain à 9h00.", h.hint)
+        assertEquals(at(10, 9, 12), h.takenAt)
+        assertEquals(at(11, 9), h.next)
+        assertNull(h.confirmCycle)
     }
 
     @Test fun earlyConfirmationPointsToTheDayAfter() {
-        val c = at(10, 9).toInstant().toEpochMilli()
-        val h = Home.state(s, mapOf(c to Entry(c, takenAt = at(10, 7).toInstant().toEpochMilli())), at(10, 7, 5))
+        val c = ms(at(10, 9))
+        val h = Home.state(s, mapOf(c to Entry(c, takenAt = ms(at(10, 7)))), at(10, 7, 5))
         assertEquals(Phase.TAKEN, h.phase)
-        assertEquals("Prochain rappel demain à 9h00.", h.hint)
+        assertEquals(at(11, 9), h.next)
     }
 }
 
 class WordingTest {
+    private val fr = Locale.FRENCH
+    private val en = Locale.ENGLISH
+    private val t = ZonedDateTime.of(LocalDateTime.of(2026, 11, 2, 21, 5), ZoneId.of("Europe/Paris"))
+
+    @Test fun timeFollowsLanguageAndClock() {
+        assertEquals("21h05", Wording.time(t, fr, is24h = true))
+        assertEquals("21:05", Wording.time(t, en, is24h = true))
+        assertEquals("9:05 PM", Wording.time(t, en, is24h = false))
+        assertEquals("12:00 AM", Wording.time(0, 0, en, is24h = false))
+    }
+
+    @Test fun dates() {
+        assertEquals("lundi 2 novembre", Wording.date(t, fr))
+        assertEquals("Monday, November 2", Wording.date(t, en))
+    }
+
+    @Test fun dayLetters() {
+        assertEquals("L", Wording.dayLetter(1, fr))
+        assertEquals("M", Wording.dayLetter(1, en))
+    }
+
+    @Test fun historyLabels() {
+        assertEquals("2/11", Wording.historyLabel(Frequency.WEEKLY, t, fr))
+        assertEquals("11/2", Wording.historyLabel(Frequency.WEEKLY, t, en))
+        assertEquals("lun", Wording.historyLabel(Frequency.DAILY, t, fr))
+        assertEquals("Mon", Wording.historyLabel(Frequency.DAILY, t, en))
+    }
+
     @Test fun phoneCleaning() {
         assertEquals("0639981234", Wording.cleanPhone("06 39 98 12 34"))
         assertEquals("+33639981234", Wording.cleanPhone("+33 6.39.98.12.34"))
         assertNull(Wording.cleanPhone("12"))
-    }
-
-    @Test fun delays() {
-        assertEquals("45 min", Wording.delay(45))
-        assertEquals("2 h", Wording.delay(120))
-        assertEquals("3 h 30", Wording.delay(210))
     }
 }

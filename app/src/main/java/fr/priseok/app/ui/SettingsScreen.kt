@@ -67,6 +67,7 @@ import fr.priseok.app.core.Frequency
 import fr.priseok.app.core.Schedule
 import fr.priseok.app.core.Settings
 import fr.priseok.app.core.Wording
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +83,7 @@ fun SettingsScreen(
 ) {
     val p = LocalPalette.current
     val ctx = LocalContext.current
+    val tx = rememberTexts()
     var hour by rememberSaveable { mutableStateOf(initial.hour) }
     var minute by rememberSaveable { mutableStateOf(initial.minute) }
     var freq by rememberSaveable { mutableStateOf(initial.frequency) }
@@ -90,7 +92,7 @@ fun SettingsScreen(
     var delay by rememberSaveable { mutableStateOf(initial.delayMinutes) }
     var name by rememberSaveable { mutableStateOf(initial.contactName) }
     var phone by rememberSaveable { mutableStateOf(initial.phone) }
-    var phoneError by rememberSaveable { mutableStateOf<String?>(null) }
+    var phoneError by rememberSaveable { mutableStateOf<Int?>(null) }
     var showTime by remember { mutableStateOf(false) }
 
     val maxDelay = Schedule.maxDelayMinutes(freq)
@@ -116,7 +118,7 @@ fun SettingsScreen(
     fun build(): Settings? {
         val clean = Wording.cleanPhone(phone)
         if (clean == null) {
-            phoneError = "Ajoute un numéro valide pour que l'alerte puisse partir."
+            phoneError = R.string.phone_error
             return null
         }
         val draft = Settings(hour, minute, freq, dow, dom, delay, name.trim(), clean, initial.activeSince)
@@ -134,22 +136,23 @@ fun SettingsScreen(
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 IconButton(onClick = onBack) {
-                    Icon(painterResource(R.drawable.ic_back), contentDescription = "Retour", tint = p.pine)
+                    Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back), tint = p.pine)
                 }
                 Spacer(Modifier.width(4.dp))
             }
-            Text(if (firstRun) "Bienvenue !" else "Réglages", style = MaterialTheme.typography.titleLarge, color = p.pine)
+            Text(stringResource(if (firstRun) R.string.welcome_title else R.string.settings), style = MaterialTheme.typography.titleLarge, color = p.pine)
         }
         if (firstRun) {
             Text(
-                "Trois réglages et c'est parti. Je te poserai la question à l'heure choisie, sans bruit.",
+                stringResource(R.string.welcome_text),
                 style = MaterialTheme.typography.bodyLarge, color = p.pineSoft,
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
 
+        val timeCd = stringResource(R.string.time_cd, tx.time(hour, minute))
         // When
-        Section("Quand ?")
+        Section(stringResource(R.string.section_when))
         Box(
             Modifier
                 .fillMaxWidth()
@@ -158,50 +161,50 @@ fun SettingsScreen(
                 .border(1.dp, p.line, RoundedCornerShape(28.dp))
                 .clickable(role = Role.Button) { showTime = true }
                 .padding(vertical = 18.dp)
-                .semantics { contentDescription = "Heure du rappel : ${Wording.time(hour, minute)}. Toucher pour changer." },
+                .semantics { contentDescription = timeCd },
             contentAlignment = Alignment.Center,
         ) {
-            Text("%02d:%02d".format(hour, minute), style = MaterialTheme.typography.displayMedium, color = p.pine)
+            Text(tx.time(hour, minute), style = MaterialTheme.typography.displayMedium, color = p.pine)
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(Frequency.DAILY to "Chaque jour", Frequency.WEEKLY to "Chaque semaine", Frequency.MONTHLY to "Chaque mois")
-                .forEach { (f, label) -> Toggle(label, freq == f, Modifier.weight(1f)) { freq = f } }
+            listOf(Frequency.DAILY to R.string.every_day, Frequency.WEEKLY to R.string.every_week, Frequency.MONTHLY to R.string.every_month)
+                .forEach { (f, label) -> Toggle(stringResource(label), freq == f, Modifier.weight(1f)) { freq = f } }
         }
         if (freq == Frequency.WEEKLY) {
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("L", "M", "M", "J", "V", "S", "D").forEachIndexed { i, l ->
-                    DayChip(l, Wording.dayName(i + 1), dow == i + 1) { dow = i + 1 }
+                (1..7).forEach { d ->
+                    DayChip(Wording.dayLetter(d, tx.locale), Wording.dayName(d, tx.locale), dow == d) { dow = d }
                 }
             }
         }
         if (freq == Frequency.MONTHLY) {
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Le", style = MaterialTheme.typography.bodyLarge, color = p.pine)
+                Text(stringResource(R.string.monthly_on), style = MaterialTheme.typography.bodyLarge, color = p.pine)
                 Spacer(Modifier.width(10.dp))
-                RoundStep("−", "Jour précédent") { dom = if (dom <= 1) 31 else dom - 1 }
+                RoundStep("−", stringResource(R.string.previous_day)) { dom = if (dom <= 1) 31 else dom - 1 }
                 Text(
                     "$dom", style = MaterialTheme.typography.titleLarge, color = p.pine,
                     textAlign = TextAlign.Center, modifier = Modifier.width(48.dp),
                 )
-                RoundStep("+", "Jour suivant") { dom = if (dom >= 31) 1 else dom + 1 }
+                RoundStep("+", stringResource(R.string.next_day)) { dom = if (dom >= 31) 1 else dom + 1 }
                 Spacer(Modifier.width(10.dp))
-                Text("du mois", style = MaterialTheme.typography.bodyLarge, color = p.pine)
+                Text(stringResource(R.string.monthly_of_month), style = MaterialTheme.typography.bodyLarge, color = p.pine)
             }
             if (dom > 28) {
                 Text(
-                    "Les mois plus courts, ce sera le dernier jour.",
+                    stringResource(R.string.monthly_short_hint),
                     style = MaterialTheme.typography.bodyMedium, color = p.pineSoft, modifier = Modifier.padding(top = 6.dp),
                 )
             }
         }
 
         // Delay
-        Section("Si j'oublie ?")
+        Section(stringResource(R.string.section_forget))
         Text(
-            "Un SMS part au bout de ${Wording.delay(delay)} sans réponse.",
+            stringResource(R.string.delay_line, tx.delay(delay)),
             style = MaterialTheme.typography.bodyLarge, color = p.pine,
         )
         Slider(
@@ -216,12 +219,12 @@ fun SettingsScreen(
             ),
         )
         Row(Modifier.fillMaxWidth()) {
-            Text("15 min", style = MaterialTheme.typography.labelMedium, color = p.pineSoft, modifier = Modifier.weight(1f))
-            Text(Wording.delay(maxDelay), style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
+            Text(tx.delay(15), style = MaterialTheme.typography.labelMedium, color = p.pineSoft, modifier = Modifier.weight(1f))
+            Text(tx.delay(maxDelay), style = MaterialTheme.typography.labelMedium, color = p.pineSoft)
         }
 
         // Who
-        Section("Qui prévenir ?")
+        Section(stringResource(R.string.section_who))
         val fieldColors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = p.pine, unfocusedBorderColor = p.line,
             focusedContainerColor = p.surface, unfocusedContainerColor = p.surface,
@@ -229,18 +232,18 @@ fun SettingsScreen(
         )
         OutlinedTextField(
             value = name, onValueChange = { name = it },
-            label = { Text("Prénom (facultatif)") },
+            label = { Text(stringResource(R.string.first_name)) },
             singleLine = true, shape = RoundedCornerShape(18.dp), colors = fieldColors,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
             value = phone, onValueChange = { phone = it; phoneError = null },
-            label = { Text("Numéro de téléphone") },
+            label = { Text(stringResource(R.string.phone_number)) },
             singleLine = true, shape = RoundedCornerShape(18.dp), colors = fieldColors,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             isError = phoneError != null,
-            supportingText = phoneError?.let { { Text(it) } },
+            supportingText = phoneError?.let { id -> { Text(stringResource(id)) } },
             modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = {
@@ -248,7 +251,7 @@ fun SettingsScreen(
         }) {
             Icon(painterResource(R.drawable.ic_contact), contentDescription = null, tint = p.pine, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Choisir dans mes contacts", color = p.pine, style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.pick_contact), color = p.pine, style = MaterialTheme.typography.bodyLarge)
         }
 
         Spacer(Modifier.height(24.dp))
@@ -257,36 +260,36 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(containerColor = p.pine, contentColor = p.onPine),
-        ) { Text(if (firstRun) "C'est parti" else "Enregistrer", style = MaterialTheme.typography.labelLarge) }
+        ) { Text(stringResource(if (firstRun) R.string.start else R.string.save), style = MaterialTheme.typography.labelLarge) }
 
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
                 onClick = onTestReminder, modifier = Modifier.weight(1f), shape = CircleShape,
                 border = BorderStroke(1.5.dp, p.line),
-            ) { Text("Tester le rappel", color = p.pine, textAlign = TextAlign.Center) }
+            ) { Text(stringResource(R.string.test_reminder), color = p.pine, textAlign = TextAlign.Center) }
             OutlinedButton(
                 onClick = {
                     val clean = Wording.cleanPhone(phone)
-                    if (clean == null) phoneError = "Ajoute un numéro valide pour tester." else onTestSms(clean)
+                    if (clean == null) phoneError = R.string.phone_error_test else onTestSms(clean)
                 },
                 modifier = Modifier.weight(1f), shape = CircleShape, border = BorderStroke(1.5.dp, p.line),
-            ) { Text("Tester le SMS", color = p.pine, textAlign = TextAlign.Center) }
+            ) { Text(stringResource(R.string.test_sms), color = p.pine, textAlign = TextAlign.Center) }
         }
         Spacer(Modifier.height(32.dp))
     }
 
     if (showTime) {
-        val state = rememberTimePickerState(initialHour = hour, initialMinute = minute, is24Hour = true)
+        val state = rememberTimePickerState(initialHour = hour, initialMinute = minute, is24Hour = android.text.format.DateFormat.is24HourFormat(ctx))
         AlertDialog(
             onDismissRequest = { showTime = false },
             containerColor = p.mist,
             confirmButton = {
                 TextButton(onClick = { hour = state.hour; minute = state.minute; showTime = false }) {
-                    Text("Valider", color = p.pine)
+                    Text(stringResource(R.string.ok), color = p.pine)
                 }
             },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text("Annuler", color = p.pineSoft) } },
+            dismissButton = { TextButton(onClick = { showTime = false }) { Text(stringResource(R.string.cancel), color = p.pineSoft) } },
             text = {
                 TimePicker(
                     state,

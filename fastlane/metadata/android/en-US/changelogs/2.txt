@@ -1,0 +1,1 @@
+English version. Data no longer leaves the phone through Android backups.

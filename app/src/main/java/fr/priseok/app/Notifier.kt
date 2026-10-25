@@ -21,15 +21,15 @@ object Notifier {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         // Visible but silent: no sound, no vibration.
         nm.createNotificationChannel(
-            NotificationChannel(CH_REMINDER, "Rappel du médicament", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "La question quotidienne, sans son"
+            NotificationChannel(CH_REMINDER, ctx.getString(R.string.channel_reminder), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = ctx.getString(R.string.channel_reminder_desc)
                 setSound(null, null)
                 enableVibration(false)
             }
         )
         nm.createNotificationChannel(
-            NotificationChannel(CH_INFO, "Infos sur les SMS", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Quand un SMS d'alerte part ou échoue"
+            NotificationChannel(CH_INFO, ctx.getString(R.string.channel_info), NotificationManager.IMPORTANCE_LOW).apply {
+                description = ctx.getString(R.string.channel_info_desc)
             }
         )
     }
@@ -52,10 +52,10 @@ object Notifier {
         val n = NotificationCompat.Builder(ctx, CH_REMINDER)
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(0xFFFF8EA1.toInt())
-            .setContentTitle("As-tu pris ton médicament ?")
-            .setContentText(if (late) "Ton contact a reçu l'alerte. Tu peux encore valider." else "Un petit clic quand c'est fait.")
+            .setContentTitle(ctx.getString(R.string.notif_question))
+            .setContentText(ctx.getString(if (late) R.string.notif_text_late else R.string.notif_text))
             .setContentIntent(openApp(ctx))
-            .addAction(R.drawable.ic_check, "Oui, j'ai pris", confirm)
+            .addAction(R.drawable.ic_check, ctx.getString(R.string.confirm_button), confirm)
             .setSilent(true)
             .setOnlyAlertOnce(true)
             .setAutoCancel(false)
@@ -67,12 +67,12 @@ object Notifier {
     fun cancelReminder(ctx: Context) =
         ctx.getSystemService(NotificationManager::class.java).cancel(ID_REMINDER)
 
-    fun info(ctx: Context, title: String, text: String) {
+    fun info(ctx: Context, title: Int, text: String) {
         if (!allowed(ctx)) return
         ensureChannels(ctx)
         val n = NotificationCompat.Builder(ctx, CH_INFO)
             .setSmallIcon(R.drawable.ic_notif)
-            .setContentTitle(title)
+            .setContentTitle(ctx.getString(title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openApp(ctx))

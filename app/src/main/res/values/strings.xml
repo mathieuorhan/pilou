@@ -1,3 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PriseOK</string>
+    <string name="app_name" translatable="false">PriseOK</string>
+
+    <!-- Home -->
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="confirm_button">Yes, I took it</string>
+    <string name="nothing_title">Nothing to take right now</string>
+    <string name="next_reminder">Next reminder %1$s.</string>
+    <string name="taken_title">All done, nice!</string>
+    <string name="taken_at">Taken at %1$s.</string>
+    <string name="early_title">Almost time</string>
+    <string name="early_line">Reminder at %1$s.</string>
+    <string name="early_hint">You can already confirm if it\'s taken.</string>
+    <string name="due_title">It\'s time!</string>
+    <string name="due_line">Your %1$s medication is waiting.</string>
+    <string name="due_hint">No answer and %1$s gets a text at %2$s.</string>
+    <string name="missed_title">Oops, time\'s up</string>
+    <string name="missed_sms_sent">%1$s got the alert by text at %2$s.</string>
+    <string name="missed_sms_failed">The alert text could not be sent.</string>
+    <string name="missed_no_sms">The deadline for the %1$s dose has passed.</string>
+    <string name="missed_hint">You can still confirm.</string>
+    <string name="your_contact">your contact</string>
+    <string name="your_contact_cap">Your contact</string>
+    <string name="history_days">The last few days</string>
+    <string name="history_weeks">The last few weeks</string>
+    <string name="history_months">The last few months</string>
+    <string name="status_taken">taken</string>
+    <string name="status_missed">missed</string>
+    <string name="status_pending">pending</string>
+    <string name="history_item">%1$s: %2$s</string>
+    <string name="freq_daily">Every day at %1$s</string>
+    <string name="freq_weekly">Every %1$s at %2$s</string>
+    <string name="freq_monthly">Day %1$d of every month at %2$s</string>
+    <string name="freq_monthly_first">1st of every month at %1$s</string>
+    <string name="when_today">today at %1$s</string>
+    <string name="when_tomorrow">tomorrow at %1$s</string>
+    <string name="when_date">%1$s at %2$s</string>
+
+    <!-- Mascot, for screen readers -->
+    <string name="mascot_waiting">Pilou is waiting. Tap it to confirm the dose.</string>
+    <string name="mascot_happy">Pilou is happy: the dose is taken.</string>
+    <string name="mascot_worried">Pilou is worried: the dose was not confirmed.</string>
+    <string name="mascot_sleepy">Pilou is asleep: nothing to take right now.</string>
+
+    <!-- Settings -->
+    <string name="welcome_title">Welcome!</string>
+    <string name="welcome_text">Three settings and you\'re set. I\'ll ask at the chosen time, without a sound.</string>
+    <string name="section_when">When?</string>
+    <string name="time_cd">Reminder time: %1$s. Tap to change.</string>
+    <string name="every_day">Every day</string>
+    <string name="every_week">Every week</string>
+    <string name="every_month">Every month</string>
+    <string name="monthly_on">On day</string>
+    <string name="monthly_of_month">of the month</string>
+    <string name="previous_day">Previous day</string>
+    <string name="next_day">Next day</string>
+    <string name="monthly_short_hint">In shorter months, the last day is used.</string>
+    <string name="section_forget">If I forget?</string>
+    <string name="delay_line">A text goes out after %1$s without an answer.</string>
+    <string name="delay_min">%1$d min</string>
+    <string name="delay_h">%1$d h</string>
+    <string name="delay_hm">%1$d h %2$02d min</string>
+    <string name="section_who">Who should be told?</string>
+    <string name="first_name">First name (optional)</string>
+    <string name="phone_number">Phone number</string>
+    <string name="pick_contact">Pick from my contacts</string>
+    <string name="phone_error">Add a valid number so the alert can be sent.</string>
+    <string name="phone_error_test">Add a valid number to test.</string>
+    <string name="start">Let\'s go</string>
+    <string name="save">Save</string>
+    <string name="test_reminder">Test the reminder</string>
+    <string name="test_sms">Test the text</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="toast_test_sms">Test text sent to %1$s</string>
+    <string name="toast_denied">Permission denied: the test can\'t run.</string>
+
+    <!-- Permissions -->
+    <plurals name="perm_missing">
+        <item quantity="one">One permission is missing</item>
+        <item quantity="other">%d permissions are missing</item>
+    </plurals>
+    <string name="perm_allow">Allow</string>
+    <string name="perm_notif_title">Show the reminder</string>
+    <string name="perm_notif_why">Without it, the question doesn\'t appear.</string>
+    <string name="perm_sms_title">Send the alert text</string>
+    <string name="perm_sms_why">To tell your contact if you forget.</string>
+    <string name="perm_exact_title">Remind on time</string>
+    <string name="perm_exact_why">Otherwise the reminder may come late.</string>
+    <string name="perm_battery_title">Don\'t get put to sleep</string>
+    <string name="perm_battery_why">Some phones stop apps running in the background.</string>
+
+    <!-- Notifications -->
+    <string name="channel_reminder">Medication reminder</string>
+    <string name="channel_reminder_desc">The daily question, without a sound</string>
+    <string name="channel_info">Text message updates</string>
+    <string name="channel_info_desc">When an alert text is sent or fails</string>
+    <string name="notif_question">Did you take your medication?</string>
+    <string name="notif_text">One tap when it\'s done.</string>
+    <string name="notif_text_late">Your contact got the alert. You can still confirm.</string>
+
+    <!-- Text messages (sent to the contact, so keep them under 70 characters) -->
+    <string name="sms_alert">Warning! Your contact hasn\'t taken their medication.</string>
+    <string name="sms_test">PriseOK test: if you get this, alerts work.</string>
+    <string name="sms_not_sent">Text not sent</string>
+    <string name="sms_no_number">No contact number is saved.</string>
+    <string name="sms_no_permission">PriseOK isn\'t allowed to send texts. Open the app to allow it.</string>
+    <string name="sms_refused">The phone refused to send it (%1$s).</string>
+    <string name="sms_test_sent_title">Test text sent</string>
+    <string name="sms_test_sent_text">Check that it reached your contact.</string>
+    <string name="sms_test_failed_title">The test text didn\'t go out</string>
+    <string name="sms_test_failed_text">Check the network, the plan and the number, then try again.</string>
+    <string name="sms_alert_failed_title">The alert text didn\'t go out</string>
+    <string name="sms_alert_failed_text">Check the network and the plan. Your contact didn\'t get the alert.</string>
 </resources>

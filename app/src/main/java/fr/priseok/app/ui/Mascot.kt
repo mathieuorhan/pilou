@@ -94,12 +94,14 @@ fun Mascot(mood: Mood, celebrate: Int, modifier: Modifier = Modifier, onTap: (()
     val measurer = rememberTextMeasurer()
     val zStyle = TextStyle(fontFamily = Fredoka, fontSize = 22.sp, color = p.pineSoft)
 
-    val description = when (mood) {
-        Mood.WAITING -> "Pilou attend. Touche-le pour valider la prise."
-        Mood.HAPPY -> "Pilou est content : c'est pris."
-        Mood.WORRIED -> "Pilou est inquiet : la prise n'a pas été validée."
-        Mood.SLEEPY -> "Pilou dort : rien à prendre pour l'instant."
-    }
+    val description = androidx.compose.ui.res.stringResource(
+        when (mood) {
+            Mood.WAITING -> fr.priseok.app.R.string.mascot_waiting
+            Mood.HAPPY -> fr.priseok.app.R.string.mascot_happy
+            Mood.WORRIED -> fr.priseok.app.R.string.mascot_worried
+            Mood.SLEEPY -> fr.priseok.app.R.string.mascot_sleepy
+        }
+    )
 
     Canvas(
         modifier

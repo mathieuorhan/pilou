@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import fr.priseok.app.core.Home
 import fr.priseok.app.core.Settings
-import fr.priseok.app.core.Wording
 import fr.priseok.app.ui.HomeScreen
 import fr.priseok.app.ui.LocalPalette
 import fr.priseok.app.ui.PermissionsCard
@@ -37,6 +36,7 @@ import fr.priseok.app.ui.PriseTheme
 import fr.priseok.app.ui.SettingsScreen
 import fr.priseok.app.ui.hasPermission
 import fr.priseok.app.ui.historyItems
+import fr.priseok.app.ui.rememberTexts
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
 
@@ -74,7 +74,7 @@ private fun App() {
     var pendingTest by remember { mutableStateOf<(() -> Unit)?>(null) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) pendingTest?.invoke()
-        else Toast.makeText(ctx, "Autorisation refusée : le test ne peut pas se faire.", Toast.LENGTH_LONG).show()
+        else Toast.makeText(ctx, R.string.toast_denied, Toast.LENGTH_LONG).show()
         pendingTest = null
         tick++
     }
@@ -101,18 +101,22 @@ private fun App() {
                 },
                 onTestSms = { phone ->
                     withPermission(Manifest.permission.SEND_SMS) {
-                        if (Sms.sendTest(ctx, phone)) Toast.makeText(ctx, "SMS de test envoyé à $phone", Toast.LENGTH_SHORT).show()
+                        if (Sms.sendTest(ctx, phone)) Toast.makeText(ctx, ctx.getString(R.string.toast_test_sms, phone), Toast.LENGTH_SHORT).show()
                     }
                 },
             )
         } else {
             val now = ZonedDateTime.now()
             val history = store.history()
+            val tx = rememberTexts()
+            val home = Home.state(settings, history, now)
             HomeScreen(
-                state = Home.state(settings, history, now),
-                frequencyText = Wording.frequency(settings),
-                historyTitle = Wording.historyTitle(settings.frequency),
-                history = historyItems(settings, history, now),
+                phase = home.phase,
+                text = tx.home(home, settings, now),
+                confirmCycle = home.confirmCycle,
+                frequencyText = tx.frequency(settings),
+                historyTitle = tx.historyTitle(settings.frequency),
+                history = historyItems(settings, history, now, tx.locale),
                 celebrate = celebrate,
                 permissions = { PermissionsCard(refreshKey = tick, onChanged = { tick++; Alarms.reschedule(ctx) }) },
                 onConfirm = { cycle ->

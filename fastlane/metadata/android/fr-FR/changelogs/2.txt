@@ -1,0 +1,1 @@
+Version anglaise. Les données ne quittent plus le téléphone via les sauvegardes Android.
