@@ -1,1 +1,1 @@
-Several medications, each with its own times, days, end date and alert time. Several contacts: each medication chooses who to text, or nobody. Doses at the same time are confirmed together, or one medication at a time. Snooze and undo, and medications can be paused.
+Several medications, each with its own times, days, end date and SMS alert. Several contacts: each medication chooses who to text, or nobody. The alert goes out after a delay you choose. Doses at the same time are confirmed together, or one medication at a time. Snooze and undo, and medications can be paused.
